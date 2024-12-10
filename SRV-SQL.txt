@@ -1,0 +1,131 @@
+#!/bin/bash
+
+# Задать имя хоста
+hostnamectl set-hostname SRV-SQL
+
+# Имя пользователя и пароль
+echo "Создание пользователя Server_Admin"
+USERNAME="Server_Admin"
+PASSWORD="P@ssw0rd"
+USER_ID=1010
+# Создание пользователя
+useradd -m -s /bin/bash -u "$USER_ID" "$USERNAME"
+echo "$USERNAME:$PASSWORD" | chpasswd
+usermod -aG wheel "$USERNAME"
+# Настройка sudo без пароля
+echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USERNAME"
+echo "Пользователь $USERNAME создан и настроен для использования sudo без пароля."
+
+# Настройка порта SSH
+echo "Настройка порта SSH..."
+semanage port -a -t ssh_port_t -p tcp 2020
+setenforce 0
+sed -i 's/^#Port 22/Port 2020/' /etc/ssh/sshd_config
+
+# Разрешение подключения только пользователю Server_Admin
+echo "Ограничение входа только для пользователя Server_Admin..."
+sed -i '/^#PermitRootLogin /c\PermitRootLogin no' /etc/ssh/sshd_config
+sed -i '/^#AllowUsers /d' /etc/ssh/sshd_config
+echo "AllowUsers Server_Admin" >> /etc/ssh/sshd_config
+
+# Ограничение количества попыток входа
+echo "Ограничение количества попыток входа..."
+sed -i '/^#MaxAuthTries 6 /c\MaxAuthTries 3' /etc/ssh/sshd_config
+
+# Настройка баннера SSH
+echo "Настройка SSH баннера..."
+BANNER_PATH="/etc/ssh-banner"
+echo "Добро пожаловать Server_Admin!" > $BANNER_PATH
+sed -i '/^#Banner none /c\Banner '"$BANNER_PATH" /etc/ssh/sshd_config
+
+# Перезапуск службы SSH для применения изменений
+echo "Перезапуск службы SSH..."
+systemctl restart sshd
+
+echo "установка chrony"
+dnf install chrony
+
+echo "настройка chrony"
+timedatectl set-timezone Europe/Moscow
+sed -i 's/server ntp1.vniiftri.ru iburst/server 172.16.220.1 iburst/' /etc/chrony.conf
+sed -i 's/server ntp2.vniiftri.ru iburst/#server ntp2.vniiftri.ru iburst/' /etc/chrony.conf
+sed -i 's/server ntp3.vniiftri.ru iburst/#server ntp3.vniiftri.ru iburst/' /etc/chrony.conf
+sed -i 's/server ntp4.vniiftri.ru iburst/#server ntp4.vniiftri.ru iburst/' /etc/chrony.conf
+systemctl enable --now chronyd
+systemctl restart chronyd
+
+# Установка Node Exporter
+wget https://github.com/prometheus/node_exporter/releases/download/v1.5.0/node_exporter-1.5.0.linux-amd64.tar.gz
+tar -xvzf node_exporter-1.5.0.linux-amd64.tar.gz
+useradd -rs /bin/false nodeusr
+mv node_exporter-1.5.0.linux-amd64/node_exporter /usr/bin/
+restorecon -v /usr/bin/node_exporter
+
+# Создание systemd-сервиса для Node Exporter
+sudo tee /etc/systemd/system/node_exporter.service > /dev/null <<EOF
+[Unit]
+Description=Node Exporter
+After=network.target
+[Service]
+User=nodeusr
+Group=nodeusr
+Type=simple
+ExecStart=/usr/bin/node_exporter
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Запуск и включение Node Exporter
+systemctl enable node_exporter --now
+systemctl status node_exporter
+
+# Сообщение об успешной установке
+echo "Установка Node Exporter завершена."
+echo "Node Exporter работает на порту 9100."
+dnf install -y nfs-utils
+
+#PostgreSQL и pgAdmin4
+echo "PostgreSQL и pgAdmin4"
+dnf install -y postgresql15-server pgadmin4 pgadmin4-qt pgadmin4-langpack-ru httpd python3-mod_wsgi pgadmin4-httpd
+postgresql-15-setup initdb
+systemctl enable postgresql-15.service --now
+mkdir -p /var/log/pgadmin4/
+setsebool -P httpd_can_network_connect 1
+setsebool -P httpd_can_network_connect_db 1
+semanage fcontext -a -t httpd_sys_rw_content_t "/var/lib/pgadmin4(/.*)?"
+semanage fcontext -a -t httpd_sys_rw_content_t "/var/log/pgadmin4(/.*)?"
+restorecon -R /var/lib/pgadmin4/
+restorecon -R /var/log/pgadmin4/
+systemctl enable httpd --now
+
+
+cat << EOF >> /usr/lib/pgadmin4/config_local.py 
+import os
+from config import *
+HELP_PATH = '/usr/share/doc/pgadmin4/html/'
+DATA_DIR = os.path.realpath(os.path.expanduser(u'/var/lib/pgadmin4'))
+LOG_FILE = os.path.join(DATA_DIR, 'pgadmin4.log')
+SQLITE_PATH = os.path.join(DATA_DIR, 'pgadmin4.db')
+SESSION_DB_PATH = os.path.join(DATA_DIR, 'sessions')
+STORAGE_DIR = os.path.join(DATA_DIR, 'storage')
+AZURE_CREDENTIAL_CACHE_DIR = os.path.join(DATA_DIR, 'azurecredentialcache')
+KERBEROS_CCACHE_DIR = os.path.join(DATA_DIR, 'krbccache')
+TEST_SQLITE_PATH = os.path.join(DATA_DIR, 'test_pgadmin4.db')
+EOF
+
+python /usr/lib/pgadmin4/setup.py <<EOF
+pasha@gmail.com
+QWEasd11
+EOF
+chown -R apache:apache /var/lib/pgadmin4 /var/log/pgadmin4
+systemctl restart httpd
+1="#listen_addresses = 'localhost'"
+2="listen_addresses = '*'"
+sed -i '1 a host all all 0.0.0.0/0 md5' /var/lib/pgsql/15/data/pg_hba.conf
+su - postgres <<EOF
+psql
+ALTER USER postgres WITH ENCRYPTED PASSWORD 'QWEasd11';
+EOF
+systemctl restart postgresql-15.service
+echo "ПОМЕНЯЙ $1 на $2 в /var/lib/pgsql/15/data/postgresql.conf почта:pasha@gmail.com.ПЕРЕЙДИ ПО http://<IP-адрес_сервера>/pgadmin4"
+

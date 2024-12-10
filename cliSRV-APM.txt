@@ -1,0 +1,30 @@
+#!/bin/bash
+
+# Установка Node Exporter
+wget https://github.com/prometheus/node_exporter/releases/download/v1.5.0/node_exporter-1.5.0.linux-amd64.tar.gz
+tar -xvzf node_exporter-1.5.0.linux-amd64.tar.gz
+useradd -rs /bin/false nodeusr
+mv node_exporter-1.5.0.linux-amd64/node_exporter /usr/bin/
+restorecon -v /usr/bin/node_exporter
+
+# Создание systemd-сервиса для Node Exporter
+sudo tee /etc/systemd/system/node_exporter.service > /dev/null <<EOF
+[Unit]
+Description=Node Exporter
+After=network.target
+[Service]
+User=nodeusr
+Group=nodeusr
+Type=simple
+ExecStart=/usr/bin/node_exporter
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Запуск и включение Node Exporter
+systemctl enable node_exporter --now
+systemctl status node_exporter
+
+# Сообщение об успешной установке
+echo "Установка Node Exporter завершена."
+echo "Node Exporter работает на порту 9100."

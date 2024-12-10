@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Установка пакетов
+dnf install -y mariadb-server rsyslog-mysql php php-mysqlnd httpd mysql php-xml php-mbstring
+setsebool -P httpd_can_network_connect 1
+setsebool -P httpd_can_network_connect_db 1
+sed -i "s/SELINUX=enforcing/SELINUX=permissive/" /etc/selinux/config
+setenforce 0
+systemctl enable httpd --now
+systemctl enable mariadb --now
+
+iptables -A INPUT -p tcp --dport 514 -j ACCEPT
+iptables -A INPUT -p udp --dport 514 -j ACCEPT
+semanage port -m -t syslogd_port_t -p tcp 514
+semanage port -m -t syslogd_port_t -p udp 514
+
+
+mariadb-admin -u root password QWEasd11
+mariadb -u root -p < /usr/share/doc/rsyslog/mysql-createDB.sql
+mariadb -u root -p < /usr/share/doc/rsyslog/mysql-createDB.sql
+mysql -u root -p < /usr/share/doc/rsyslog/mysql-createDB.sql
+# Переменные
+DB_ROOT_USER="root"
+DB_ROOT_PASSWORD="QWEasd11"
+DB_NAME="Syslog"
+DB_USER="rsyslog"
+DB_PASSWORD="QWEasd11"
+
+# Создание базы данных, пользователя и предоставление прав
+mysql -u $DB_ROOT_USER -p"$DB_ROOT_PASSWORD" <<EOF
+GRANT ALL ON Syslog.* TO 'rsyslog'@'localhost' IDENTIFIED BY 'QWEasd11';
+FLUSH PRIVILEGES;
+EOF
+
+#Настройка rsyslog
+sed -i '39 a module(load="ommysql")' /etc/rsyslog.conf
+sed -i '41 a *.* :ommysql:localhost,Syslog,rsyslog,QWEasd11' /etc/rsyslog.conf
+systemctl restart rsyslog.service
+
+
+# Включаем прием сообщений от клиентов
+sed -i 's/#module(load="imudp")/module(load="imudp")/' /etc/rsyslog.conf
+sed -i 's/#input(type="imudp" port="514")/input(type="imudp" port="514")/' /etc/rsyslog.conf
+sed -i 's/#module(load="imtcp")/module(load="imtcp")/' /etc/rsyslog.conf
+sed -i 's/#input(type="imtcp" port="514")/input(type="imtcp" port="514")/' /etc/rsyslog.conf
+sed -i '/input(type="imtcp" port="514")/ a \$template RemoteLogs,"/var/log/rsyslog/%HOSTNAME%/%PROGRAMNAME%.log"' /etc/rsyslog.conf
+sed -i '/input(type="imtcp" port="514")/ a *.* ?RemoteLogs' /etc/rsyslog.conf
+sed -i '/input(type="imtcp" port="514")/ a & ~' /etc/rsyslog.conf
+systemctl restart rsyslog.service
+
+# Создаем директорию для хранения логов
+#cat << EOF >> /etc/rsyslog.d/mysql.conf
+#module(load="ommysql")
+#*.err action(type="ommysql" server="localhost" db="Syslog" uid="rsyslog" pwd="QWEasd11") 
+#*.crit action(type="ommysql" server="localhost" db="Syslog" uid="rsyslog" pwd="QWEasd11")
+#EOF
+rsyslogd -N1
+# Добавляем правило для хранения логов клиентов
+#echo -e "\n# Хранение логов от клиентов" >> /etc/rsyslog.conf
+#echo "$template RemoteLogs,"/var/log/rsyslog/%HOSTNAME%/%PROGRAMNAME%.log" >> /etc/rsyslog.conf
+#echo "*.* ?RemoteLogs" >> /etc/rsyslog.conf
+#echo "\$StopLogging" >> /etc/rsyslog.conf
+systemctl restart rsyslog.service
+
+#установка
+dnf install -y loganalyzer
+ln -s /usr/share/loganalyzer/ /var/www/html/loganalyzer
+cd /var/www/html/loganalyzer
+restorecon -R /var/www/html/loganalyzer
+chcon -t httpd_sys_rw_content_t config.php
+chmod 777 config.php
+echo "Откройте браузер и в адресной строке пропишите http://localhost/loganalyzer/"
