@@ -1,0 +1,183 @@
+#!/bin/bash
+
+# Задать имя хоста
+hostnamectl set-hostname R-Left
+
+# Настройка сетевых интерфейсов
+echo "Настройка сетевых интерфейсов..."
+INTERFACE_OFFICE12STUL="enp0s8"  # Интерфейс в сторону офиса «12 Стульев»
+INTERFACE_TOISP="enp0s3"      # Интерфейс в сторону ISP
+
+# Расчет и назначение IP-адресов
+nmcli con modify $INTERFACE_OFFICE12STUL ipv4.address 192.168.220.1/27
+nmcli con modify $INTERFACE_OFFICE12STUL ipv4.method static
+systemctl restart NetworkManager
+
+# Включение пересылки пакетов
+echo "Включение IP-перенаправления..."
+echo net.ipv4.ip_forward=1 > /etc/sysctl.conf
+sysctl -p
+
+# Настройка DHCP-сервера
+dnf install  dhcp-server -y
+echo "Настройка DHCP..."
+cat <<EOF > /etc/dhcp/dhcpd.conf
+default-lease-time 600;
+max-lease-time 7200;
+
+
+subnet 192.168.220.0 netmask 255.255.255.224 {
+    range 192.168.220.2 192.168.220.30;
+    option routers 192.168.220.1;
+    option domain-name-servers 8.8.8.8, 8.8.4.4;
+}
+EOF
+systemctl enable --now dhcpd
+
+# Настройка nftables
+dnf install -y nftables
+echo "Настройка nftables..."
+
+# Создаем файл конфигурации и записываем правила
+CONFIG_FILE1="/etc/nftables/r-left.nft"
+echo "Создаем файл конфигурации $CONFIG_FILE..."
+touch $CONFIG_FILE1
+cat > $CONFIG_FILE1 << 'EOF'
+table inet nat {
+    chain POSTROUTING {
+        type nat hook postrouting priority srcnat;
+        oifname masquerade
+    }
+}
+EOF
+sed -i "s/oifname /oifname $INTERFACE_TOISP /" $CONFIG_FILE1
+
+# Добавляем строку include в файл /etc/sysconfig/nftables.conf
+CONFIG_FILE2="/etc/sysconfig/nftables.conf"
+INCLUDE_LINE='include "/etc/nftables/r-left.nft"'
+
+echo "Добавляем строку '$INCLUDE_LINE' в файл $CONFIG_FILE..."
+if ! grep -Fxq "$INCLUDE_LINE" "$CONFIG_FILE2"; then
+    echo "$INCLUDE_LINE" | sudo tee -a "$CONFIG_FILE2"
+    echo "Строка добавлена."
+else
+    echo "Строка уже существует."
+fi
+
+# Запускаем и добавляем nftables в автозагрузку
+echo "Запуск сервиса nftables и добавление в автозагрузку..."
+systemctl enable --now nftables
+
+
+# Параметры туннеля
+LOCAL_IP="11.11.0.2"         # Локальный IP-адрес
+REMOTE_IP="22.22.0.2"        # Удалённый IP-адрес
+TUNNEL_LOCAL_IP="10.10.10.1"     # Локальный IP туннеля
+TUNNEL_REMOTE_IP="10.10.10.2"    # Удалённый IP туннеля
+TUNNEL_NAME="gre-tunnel0"      # Имя туннеля
+NETWORK_OFFICE12STUL="192.168.220.0/27"
+NETWORK_OFFICEGOLDTELENOK="172.16.220.0/27"
+
+
+# Создание GRE туннеля
+echo "Создание GRE туннеля..."
+
+nmcli con add type ip-tunnel ip-tunnel.mode gre con-name $TUNNEL_NAME ifname $TUNNEL_NAME \
+remote $REMOTE_IP local $LOCAL_IP
+nmcli con mod $TUNNEL_NAME ipv4.addresses $TUNNEL_LOCAL_IP/30
+nmcli con mod $TUNNEL_NAME ipv4.method manual
+#nmcli con mod $TUNNEL_NAME +ipv4.routes "$NETWORK_OFFICEGOLDTELENOK $TUNNEL_REMOTE_IP"
+nmcli connection modify $TUNNEL_NAME ip-tunnel.ttl 64
+nmcli con up $TUNNEL_NAME
+
+# Вывод информации о туннеле
+echo "Туннель успешно настроен. Информация о туннеле:"
+ip addr show $TUNNEL_NAME
+
+#Настройка динамической (внутренней) маршрутизации средствами FRR
+echo "Настройка FRR"
+dnf install -y frr
+sed -i "s/ospfd=no/ospfd=yes/" /etc/frr/daemons
+sed -i "s/ospf6d=no/ospf6d=yes/" /etc/frr/daemons
+systemctl enable --now frr
+
+# Запись нового содержимого в файл frr.conf
+cat <<EOL > /etc/frr/frr.conf
+frr version 10.1
+frr defaults traditional
+hostname R-Left
+no ipv6 forwarding
+!
+interface $TUNNEL_NAME
+ ip ospf authentication
+ ip ospf authentication-key password
+ no ip ospf passive
+exit
+!
+router ospf
+ passive-interface default
+ network 10.10.10.0/30 area 0
+ network $NETWORK_OFFICE12STUL area 0
+exit
+!
+EOL
+echo "Файл frr.conf успешно обновлен."
+systemctl restart frr
+
+#Создание backup скрипта
+echo "Создание backup скрипта"
+mkdir /var/{backup,backup-script}
+touch /var/backup-script/backup.sh
+cat <<EOL > /var/backup-script/backup.sh
+#!/bin/bash
+
+# Системная переменная с текущей датой
+#data=$(date +%d.%m.%Y-%H:%M:%S)
+# Создание директории с текущей датой/временем
+#mkdir /var/backup/
+mkdir /var/backup/$data
+# Копирование  настроек frr
+#cp -r /etc/frr /var/backup/$data
+# Копирование настроек nftables
+#cp -r /etc/nftables /var/backup/$data
+# Копирование настроек сетевых интерфейсов
+#cp -r /etc/NetworkManager/system-connections /var/backup/$data
+# Копирование настроек DHCP
+#cp -r /etc/dhcp /var/backup/$data
+# Переход  в директорию
+#cd /var/backup
+# Архивируем
+#tar czfv "./$data.tar.gz" ./$data
+# Удаляем временную директорию
+#rm -r /var/backup/$data
+EOL
+chmod +x /var/backup-script/backup.sh
+
+# Имя пользователя и пароль
+echo "Создание пользователя Net_Admin"
+USERNAME="Net_Admin"
+PASSWORD="P@\$\$word"
+# Создание пользователя
+useradd -m -s /bin/bash "$USERNAME"
+echo "$USERNAME:$PASSWORD" | chpasswd
+usermod -aG wheel "$USERNAME"
+# Настройка sudo без пароля
+echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USERNAME"
+echo "Пользователь $USERNAME создан и настроен для использования sudo без пароля."
+
+NETWORK_TUNNEL="10.10.10.0/30" 
+echo "установка chrony"
+dnf install chrony
+echo "настройка chrony"
+timedatectl set-timezone Europe/Moscow
+sed -i 's/server ntp1.vniiftri.ru iburst/#server 172.16.220.1 iburst/' /etc/chrony.conf
+sed -i 's/server ntp2.vniiftri.ru iburst/#server ntp2.vniiftri.ru iburst/' /etc/chrony.conf
+sed -i 's/server ntp3.vniiftri.ru iburst/#server ntp3.vniiftri.ru iburst/' /etc/chrony.conf
+sed -i 's/server ntp4.vniiftri.ru iburst/#server ntp4.vniiftri.ru iburst/' /etc/chrony.conf
+systemctl restart chronyd
+systemctl enable --now  chronyd
+
+dnf install -y nfs-utils
+
+
+echo "Настройка завершена."
