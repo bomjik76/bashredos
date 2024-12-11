@@ -1,0 +1,28 @@
+#!/bin/bash
+
+NETWORK_TUNNEL="10.10.10.0/30"      # Имя туннеля
+NETWORK_OFFICE12STUL="192.168.220.0/27"
+NETWORK_OFFICEGOLDTELENOK="172.16.220.0/27"
+
+echo "установка chrony"
+dnf install chrony
+
+echo "настройка chrony"
+timedatectl set-timezone Europe/Moscow
+sed -i 's/server ntp1.vniiftri.ru iburst/#server ntp1.vniiftri.ru iburst/' /etc/chrony.conf
+sed -i 's/server ntp2.vniiftri.ru iburst/#server ntp2.vniiftri.ru iburst/' /etc/chrony.conf
+sed -i 's/server ntp3.vniiftri.ru iburst/#server ntp3.vniiftri.ru iburst/' /etc/chrony.conf
+sed -i 's/server ntp4.vniiftri.ru iburst/#server ntp4.vniiftri.ru iburst/' /etc/chrony.conf
+
+touch chrony.txt
+cat << EOF > chrony.txt
+server 127.0.0.1 iburst prefer
+local stratum 6
+allow $NETWORK_TUNNEL
+allow $NETWORK_OFFICE12STUL
+allow $NETWORK_OFFICEGOLDTELENOK"
+EOF
+sed '1r chrony.txt' /etc/chrony.conf
+
+systemctl restart chronyd
+systemctl enable --now  chronyd
