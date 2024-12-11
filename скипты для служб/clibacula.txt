@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# Переменные
+BACULA_DIR_IP="192.168.220.5" # IP-адрес сервера Bacula Director
+FD_PASSWORD="supersecurepassword" # Пароль для взаимодействия с Director
+
+# Обновляем систему
+echo "Обновляем систему..."
+dnf update -y
+
+# Устанавливаем Bacula File Daemon
+echo "Устанавливаем Bacula File Daemon..."
+dnf install -y bacula-client
+
+# Настраиваем конфигурацию Bacula FD
+echo "Настраиваем Bacula File Daemon..."
+cat > /etc/bacula/bacula-fd.conf <<EOL
+FileDaemon {
+  Name = client-fd
+  FDport = 9102
+  WorkingDirectory = "/var/lib/bacula"
+  PidDirectory = "/var/run/bacula"
+  MaximumConcurrentJobs = 20
+}
+
+Director {
+  Name = bacula-dir
+  Password = "${FD_PASSWORD}"
+  Address = ${BACULA_DIR_IP}
+}
+EOL
+
+# Настраиваем брандмауэр
+echo "Настраиваем брандмауэр для Bacula..."
+firewall-cmd --permanent --add-port=9102/tcp
+firewall-cmd --reload
+
+# Перезапускаем Bacula FD
+echo "Перезапускаем Bacula File Daemon..."
+systemctl enable bacula-fd
+systemctl restart bacula-fd
+
+echo "Настройка Bacula File Daemon завершена!"
+echo "Убедитесь, что сервер Bacula Director настроен для подключения к этому клиенту."

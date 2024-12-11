@@ -1,0 +1,133 @@
+#!/bin/bash
+
+# Остановить выполнение при ошибке
+set -e
+
+# Обновляем систему
+echo "Обновляем систему..."
+dnf update -y
+
+# Устанавливаем необходимые пакеты
+echo "Устанавливаем Bacula..."
+dnf install -y bacula-director bacula-console bacula-storage bacula-client
+
+# Создаем каталог для хранения резервных копий
+echo "Создаем каталог для хранения резервных копий..."
+mkdir -p /backup/bacula
+chown bacula:bacula /backup/bacula
+
+# Настраиваем Director
+echo "Настраиваем Bacula Director..."
+cat > /etc/bacula/bacula-dir.conf <<EOL
+Director {
+  Name = bacula-dir
+  DIRport = 9101
+  QueryFile = "/etc/bacula/scripts/query.sql"
+  WorkingDirectory = "/var/lib/bacula"
+  PidDirectory = "/var/run/bacula"
+  MaximumConcurrentJobs = 20
+  Password = "supersecurepassword"
+  Messages = Standard
+}
+
+Job {
+  Name = "Backup-etc"
+  JobDefs = "DefaultJob"
+  Client = bacula-fd
+  FileSet = "FullSet"
+  Schedule = "WeeklyCycle"
+  Storage = File
+}
+
+FileSet {
+  Name = "FullSet"
+  Include {
+    File = /etc
+  }
+}
+
+Schedule {
+  Name = "WeeklyCycle"
+  Run = Level=Full on 1st sun at 02:00
+  Run = Level=Differential on sun-thu at 02:00
+}
+
+Client {
+  Name = client-fd
+  Address = 172.16.220.6 # IP-адрес клиента
+  FDPort = 9102
+  Password = "supersecurepassword"
+  Catalog = MyCatalog
+  FileRetention = 30 days
+  JobRetention = 6 months
+  AutoPrune = yes
+}
+
+Storage {
+  Name = File
+  Address = 127.0.0.1
+  SDPort = 9103
+  Password = "supersecurepassword"
+  Device = FileStorage
+  MediaType = File
+}
+
+Messages {
+  Name = Standard
+  mailcommand = "/usr/sbin/bsmtp -h localhost -f \"\(Bacula\)\" -s \"Bacula message\" %r"
+  operator = root@localhost = all, !skipped
+  mail = root@localhost = all, !skipped
+  console = all, !skipped, !saved
+  catalog = all
+}
+EOL
+
+# Настраиваем Storage Daemon
+echo "Настраиваем Bacula Storage Daemon..."
+cat > /etc/bacula/bacula-sd.conf <<EOL
+Storage {
+  Name = File
+  SDPort = 9103
+  WorkingDirectory = "/var/lib/bacula"
+  PidDirectory = "/var/run/bacula"
+  MaximumConcurrentJobs = 20
+  Device = FileStorage
+  MediaType = File
+  Password = "supersecurepassword"
+}
+
+Device {
+  Name = FileStorage
+  MediaType = File
+  ArchiveDevice = /backup/bacula
+  LabelMedia = yes
+  RandomAccess = yes
+  AutomaticMount = yes
+  RemovableMedia = no
+  AlwaysOpen = no
+}
+EOL
+
+# Настраиваем File Daemon
+echo "Настраиваем Bacula File Daemon..."
+cat > /etc/bacula/bacula-fd.conf <<EOL
+FileDaemon {
+  Name = bacula-fd
+  FDport = 9102
+  WorkingDirectory = "/var/lib/bacula"
+  PidDirectory = "/var/run/bacula"
+  MaximumConcurrentJobs = 20
+}
+
+Director {
+  Name = bacula-dir
+  Password = "supersecurepassword"
+}
+EOL
+
+# Перезапускаем службы Bacula
+echo "Перезапускаем службы Bacula..."
+systemctl enable bacula-dir bacula-sd bacula-fd
+systemctl restart bacula-dir bacula-sd bacula-fd
+
+echo "Настройка Bacula завершена!"
