@@ -11,7 +11,7 @@ INTERFACE_TOISP="enp0s3"      # Интерфейс в сторону ISP
 # Параметры туннеля
 LOCAL_IP="11.11.0.2"         # Локальный IP-адрес
 REMOTE_IP="22.22.0.2"        # Удалённый IP-адрес
-TUNNEL_LOCAL_IP="10.10.10.1"     # Локальный IP туннеля
+TUNNEL_LOCAL_IP="10.10.10.1/30"     # Локальный IP туннеля
 TUNNEL_REMOTE_IP="10.10.10.2"    # Удалённый IP туннеля
 TUNNEL_NAME="gre-tunnel0"      # Имя туннеля
 NETWORK_BRANCH="192.168.220.0/27"
@@ -87,7 +87,7 @@ echo "Создание GRE туннеля..."
 
 nmcli con add type ip-tunnel ip-tunnel.mode gre con-name $TUNNEL_NAME ifname $TUNNEL_NAME \
 remote $REMOTE_IP local $LOCAL_IP
-nmcli con mod $TUNNEL_NAME ipv4.addresses $TUNNEL_LOCAL_IP/30
+nmcli con mod $TUNNEL_NAME ipv4.addresses $TUNNEL_LOCAL_IP
 nmcli con mod $TUNNEL_NAME ipv4.method manual
 #nmcli con mod $TUNNEL_NAME +ipv4.routes "$NETWORK_HQ $TUNNEL_REMOTE_IP"
 nmcli connection modify $TUNNEL_NAME ip-tunnel.ttl 64
@@ -127,35 +127,6 @@ EOL
 echo "Файл frr.conf успешно обновлен."
 systemctl restart frr
 
-#Создание backup скрипта
-echo "Создание backup скрипта"
-mkdir /var/{backup,backup-script}
-touch /var/backup-script/backup.sh
-cat <<EOL > /var/backup-script/backup.sh
-#!/bin/bash
-
-# Системная переменная с текущей датой
-#data=$(date +%d.%m.%Y-%H:%M:%S)
-# Создание директории с текущей датой/временем
-#mkdir /var/backup/
-mkdir /var/backup/$data
-# Копирование  настроек frr
-#cp -r /etc/frr /var/backup/$data
-# Копирование настроек nftables
-#cp -r /etc/nftables /var/backup/$data
-# Копирование настроек сетевых интерфейсов
-#cp -r /etc/NetworkManager/system-connections /var/backup/$data
-# Копирование настроек DHCP
-#cp -r /etc/dhcp /var/backup/$data
-# Переход  в директорию
-#cd /var/backup
-# Архивируем
-#tar czfv "./$data.tar.gz" ./$data
-# Удаляем временную директорию
-#rm -r /var/backup/$data
-EOL
-chmod +x /var/backup-script/backup.sh
-
 # Имя пользователя и пароль
 echo "Создание пользователя Net_Admin"
 # Создание пользователя
@@ -165,16 +136,11 @@ usermod -aG wheel "$USERNAME"
 # Настройка sudo без пароля
 echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USERNAME"
 echo "Пользователь $USERNAME создан и настроен для использования sudo без пароля."
-
-NETWORK_TUNNEL="10.10.10.0/30" 
+ 
 echo "установка chrony"
 dnf install chrony
 echo "настройка chrony"
 timedatectl set-timezone Europe/Moscow
-sed -i 's/server ntp1.vniiftri.ru iburst/#server 172.16.220.1 iburst/' /etc/chrony.conf
-sed -i 's/server ntp2.vniiftri.ru iburst/#server ntp2.vniiftri.ru iburst/' /etc/chrony.conf
-sed -i 's/server ntp3.vniiftri.ru iburst/#server ntp3.vniiftri.ru iburst/' /etc/chrony.conf
-sed -i 's/server ntp4.vniiftri.ru iburst/#server ntp4.vniiftri.ru iburst/' /etc/chrony.conf
 systemctl restart chronyd
 systemctl enable --now  chronyd
 
