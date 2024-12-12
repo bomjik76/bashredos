@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# Очистка текущих правил nftables
+nft flush ruleset
+
+# Создание таблицы фильтрации
+nft add table inet filter
+
+# Создание цепочек
+nft add chain inet filter input { type filter hook input priority 0 \; }
+nft add chain inet filter forward { type filter hook forward priority 0 \; }
+nft add chain inet filter output { type filter hook output priority 0 \; }
+
+# Базовые политики: блокировать всё
+nft add rule inet filter input drop
+nft add rule inet filter forward drop
+nft add rule inet filter output accept
+
+# Разрешить локальные loopback соединения
+nft add rule inet filter input iif "lo" accept
+nft add rule inet filter output oif "lo" accept
+
+# Разрешить установленные и связанные соединения
+nft add rule inet filter input ct state established,related accept
+
+# Разрешить ICMP (ping)
+nft add rule inet filter input ip protocol icmp accept
+nft add rule inet filter input ip6 nexthdr icmpv6 accept
+
+# Разрешить SSH
+nft add rule inet filter input tcp dport 22 accept
+
+# Разрешить HTTP и HTTPS
+nft add rule inet filter input tcp dport 80 accept
+nft add rule inet filter input tcp dport 443 accept
+
+# Разрешить DNS
+nft add rule inet filter input udp dport 53 accept
+nft add rule inet filter input tcp dport 53 accept
+
+# Разрешить NTP
+nft add rule inet filter input udp dport 123 accept
+
+# Запретить всё остальное (входящие подключения)
+# Это уже задано как базовая политика: drop для input
+
+# Сохранение конфигурации
+nft list ruleset > /etc/nftables.conf
+
+# Убедимся, что nftables запускается при загрузке
+systemctl enable nftables
+systemctl restart nftables
+
+echo "Межсетевой экран настроен!"
