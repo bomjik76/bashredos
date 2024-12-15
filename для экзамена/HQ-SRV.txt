@@ -1,6 +1,6 @@
 #!/bin/bash
 
-HOSTNAME=HQ-SRV
+HOSTNAME="HQ-SRV"
 # Задать имя хоста
 hostnamectl set-hostname $HOSTNAME
 
