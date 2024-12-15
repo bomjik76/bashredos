@@ -1,16 +1,39 @@
 #!/bin/bash
 
 # Задать имя хоста
-hostnamectl set-hostname R-Right
+HOSTMAME="HQ-R"
+hostnamectl set-hostname $HOSTMAME
 
 # Настройка сетевых интерфейсов
 echo "Настройка сетевых интерфейсов..."
-INTERFACE_OFFICEGOLDTELENOK="enp0s8"  # Интерфейс в сторону офиса «золотой теленок»
+INTERFACE_HQ="enp0s8"  # Интерфейс в сторону офиса HQ
 INTERFACE_TOISP="enp0s3"      # Интерфейс в сторону ISP
+IP="192.168.220.1/27"    # задать ip интерфейсу
+
+# Настройка DHCP сервера
+dhcp_1="192.168.220.0"    #подсеть
+dhcp_2="255.255.255.224"    #маска
+dhcp_3="192.168.220.2 192.168.220.30"    #пул адресов
+dhcp_4="192.168.220.1"    #путь по умолчанию
+dhcp_5="8.8.8.8, 8.8.4.4"    #серверы DNS
+
+# Параметры туннеля
+LOCAL_IP="11.11.0.2"         # Локальный IP-адрес
+REMOTE_IP="22.22.0.2"        # Удалённый IP-адрес
+TUNNEL_LOCAL_IP="10.10.10.1/30"     # Локальный IP туннеля
+TUNNEL_REMOTE_IP="10.10.10.2"    # Удалённый IP туннеля
+TUNNEL_NAME="gre-tunnel0"      # Имя туннеля
+NETWORK_BRANCH="192.168.220.0/27"
+NETWORK_HQ="172.16.220.0/27"
+NETWORK_TUNNEL="10.10.10.0/30"
+
+# Имя пользователя и пароль
+USERNAME="Net_Admin"
+PASSWORD="P@\$\$word"
 
 # Расчет и назначение IP-адресов
-nmcli con modify $INTERFACE_OFFICEGOLDTELENOK ipv4.address 172.16.220.1/27
-nmcli con modify $INTERFACE_OFFICEGOLDTELENOK ipv4.method static
+nmcli con modify $INTERFACE_HQ ipv4.address $IP
+nmcli con modify $INTERFACE_HQ ipv4.method static
 systemctl restart NetworkManager
 
 # Включение пересылки пакетов
@@ -26,10 +49,10 @@ default-lease-time 600;
 max-lease-time 7200;
 
 
-subnet 172.16.220.0 netmask 255.255.255.224 {
-    range 172.16.220.2 172.16.220.30;
-    option routers 172.16.220.1;
-    option domain-name-servers 8.8.8.8, 8.8.4.4;
+subnet $dhcp_1 netmask $dhcp_2 {
+    range $dhcp_3;
+    option routers $dhcp_4;
+    option domain-name-servers $dhcp_5;
 }
 EOF
 systemctl enable --now dhcpd
@@ -39,7 +62,7 @@ dnf install -y nftables
 echo "Настройка nftables..."
 
 # Создаем файл конфигурации и записываем правила
-CONFIG_FILE1="/etc/nftables/r-right.nft"
+CONFIG_FILE1="/etc/nftables/r-left.nft"
 echo "Создаем файл конфигурации $CONFIG_FILE..."
 touch $CONFIG_FILE1
 cat > $CONFIG_FILE1 << 'EOF'
@@ -54,7 +77,7 @@ sed -i "s/oifname /oifname $INTERFACE_TOISP /" $CONFIG_FILE1
 
 # Добавляем строку include в файл /etc/sysconfig/nftables.conf
 CONFIG_FILE2="/etc/sysconfig/nftables.conf"
-INCLUDE_LINE='include "/etc/nftables/r-right.nft"'
+INCLUDE_LINE='include "/etc/nftables/r-left.nft"'
 
 echo "Добавляем строку '$INCLUDE_LINE' в файл $CONFIG_FILE..."
 if ! grep -Fxq "$INCLUDE_LINE" "$CONFIG_FILE2"; then
@@ -68,24 +91,14 @@ fi
 echo "Запуск сервиса nftables и добавление в автозагрузку..."
 systemctl enable --now nftables
 
-# Параметры туннеля
-LOCAL_IP="22.22.0.2"         # Локальный IP-адрес
-REMOTE_IP="11.11.0.2"        # Удалённый IP-адрес
-TUNNEL_LOCAL_IP="10.10.10.2"     # Локальный IP туннеля
-TUNNEL_REMOTE_IP="10.10.10.1"    # Удалённый IP туннеля
-TUNNEL_NAME="gre-tunnel0"      # Имя туннеля
-NETWORK_OFFICE12STUL="192.168.220.0/27"
-NETWORK_OFFICEGOLDTELENOK="172.16.220.0/27"
-
-
 # Создание GRE туннеля
 echo "Создание GRE туннеля..."
 
 nmcli con add type ip-tunnel ip-tunnel.mode gre con-name $TUNNEL_NAME ifname $TUNNEL_NAME \
 remote $REMOTE_IP local $LOCAL_IP
-nmcli con mod $TUNNEL_NAME ipv4.addresses $TUNNEL_LOCAL_IP/30
+nmcli con mod $TUNNEL_NAME ipv4.addresses $TUNNEL_LOCAL_IP
 nmcli con mod $TUNNEL_NAME ipv4.method manual
-#nmcli con mod $TUNNEL_NAME +ipv4.routes "$NETWORK_OFFICE12STUL $TUNNEL_REMOTE_IP"
+#nmcli con mod $TUNNEL_NAME +ipv4.routes "$NETWORK_BRANCH $TUNNEL_REMOTE_IP"
 nmcli connection modify $TUNNEL_NAME ip-tunnel.ttl 64
 nmcli con up $TUNNEL_NAME
 
@@ -104,7 +117,7 @@ systemctl enable --now frr
 cat <<EOL > /etc/frr/frr.conf
 frr version 10.1
 frr defaults traditional
-hostname R-Right
+hostname $HOSTMAME
 no ipv6 forwarding
 !
 interface $TUNNEL_NAME
@@ -115,47 +128,16 @@ exit
 !
 router ospf
  passive-interface default
- network 10.10.10.0/30 area 0
- network $NETWORK_OFFICEGOLDTELENOK area 0
+ network $NETWORK_TUNNEL area 0
+ network $NETWORK_HQ area 0
 exit
 !
 EOL
 echo "Файл frr.conf успешно обновлен."
 systemctl restart frr
 
-#Создание backup скрипта
-echo "Создание backup скрипта"
-mkdir /var/{backup,backup-script}
-touch /var/backup-script/backup.sh
-cat <<EOL > /var/backup-script/backup.sh
-#!/bin/bash
-
-# Системная переменная с текущей датой
-#data=$(date +%d.%m.%Y-%H:%M:%S)
-# Создание директории с текущей датой/временем
-#mkdir /var/backup/
-mkdir /var/backup/$data
-# Копирование  настроек frr
-#cp -r /etc/frr /var/backup/$data
-# Копирование настроек nftables
-#cp -r /etc/nftables /var/backup/$data
-# Копирование настроек сетевых интерфейсов
-#cp -r /etc/NetworkManager/system-connections /var/backup/$data
-# Копирование настроек DHCP
-#cp -r /etc/dhcp /var/backup/$data
-# Переход  в директорию
-#cd /var/backup
-# Архивируем
-#tar czfv "./$data.tar.gz" ./$data
-# Удаляем временную директорию
-#rm -r /var/backup/$data
-EOL
-chmod +x /var/backup-script/backup.sh
-
 # Имя пользователя и пароль
-echo "Создание пользователя Net_Admin"
-USERNAME="Net_Admin"
-PASSWORD="P@\$\$word"
+echo "Создание пользователя $USERNAME"
 # Создание пользователя
 useradd -m -s /bin/bash "$USERNAME"
 echo "$USERNAME:$PASSWORD" | chpasswd
@@ -163,32 +145,53 @@ usermod -aG wheel "$USERNAME"
 # Настройка sudo без пароля
 echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USERNAME"
 echo "Пользователь $USERNAME создан и настроен для использования sudo без пароля."
-
-NETWORK_TUNNEL="10.10.10.0/30" 
+ 
 echo "установка chrony"
 dnf install chrony
-
 echo "настройка chrony"
 timedatectl set-timezone Europe/Moscow
-sed -i 's/server ntp1.vniiftri.ru iburst/#server ntp1.vniiftri.ru iburst/' /etc/chrony.conf
-sed -i 's/server ntp2.vniiftri.ru iburst/#server ntp2.vniiftri.ru iburst/' /etc/chrony.conf
-sed -i 's/server ntp3.vniiftri.ru iburst/#server ntp3.vniiftri.ru iburst/' /etc/chrony.conf
-sed -i 's/server ntp4.vniiftri.ru iburst/#server ntp4.vniiftri.ru iburst/' /etc/chrony.conf
-
-touch chrony.txt
-cat << EOF > chrony.txt
-server 127.0.0.1 iburst prefer
-local stratum 6
-allow $NETWORK_TUNNEL
-allow $NETWORK_OFFICE12STUL
-allow $NETWORK_OFFICEGOLDTELENOK"
-EOF
-sed -i '7r chrony.txt' /etc/chrony.conf
-
 systemctl restart chronyd
 systemctl enable --now  chronyd
 
 dnf install -y nfs-utils
 
+# Межсетевой экран
+nft flush ruleset
+# Создание таблицы фильтрации
+nft add table inet filter
+# Создание цепочек
+nft add chain inet filter input { type filter hook input priority 0 \; }
+nft add chain inet filter forward { type filter hook forward priority 0 \; }
+nft add chain inet filter output { type filter hook output priority 0 \; }
+# Базовые политики: блокировать всё
+nft add rule inet filter input drop
+nft add rule inet filter forward drop
+nft add rule inet filter output accept
+# Разрешить локальные loopback соединения
+nft add rule inet filter input iif "lo" accept
+nft add rule inet filter output oif "lo" accept
+# Разрешить установленные и связанные соединения
+nft add rule inet filter input ct state established,related accept
+# Разрешить ICMP (ping)
+nft add rule inet filter input ip protocol icmp accept
+nft add rule inet filter input ip6 nexthdr icmpv6 accept
+# Разрешить SSH
+nft add rule inet filter input tcp dport 22 accept
+# Разрешить HTTP и HTTPS
+nft add rule inet filter input tcp dport 80 accept
+nft add rule inet filter input tcp dport 443 accept
+# Разрешить DNS
+nft add rule inet filter input udp dport 53 accept
+nft add rule inet filter input tcp dport 53 accept
+# Разрешить NTP
+nft add rule inet filter input udp dport 123 accept
+# Запретить всё остальное (входящие подключения)
+# Это уже задано как базовая политика: drop для input
+# Сохранение конфигурации
+nft list ruleset > /etc/nftables.conf
+# Убедимся, что nftables запускается при загрузке
+systemctl enable nftables
+systemctl restart nftables
+echo "Межсетевой экран настроен!"
 
 echo "Настройка завершена."
