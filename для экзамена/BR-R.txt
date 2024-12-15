@@ -162,7 +162,7 @@ systemctl enable --now  chronyd
 
 dnf install -y nfs-utils
 
-# Создание пользователя SSH
+# Создание пользователя
 echo "Создание пользователя $USERNAMESSH"
 useradd -m -s /bin/bash -u "$USER_ID" "$USERNAMESSH"
 echo "$USERNAMESSH:$PASSWORDSSH" | chpasswd
@@ -193,7 +193,7 @@ sed -i '/^#LoginGraceTime 2m /c\LoginGraceTime $TIME' /etc/ssh/sshd_config
 # Настройка баннера SSH
 echo "Настройка SSH баннера..."
 BANNER_PATH="/etc/ssh-banner"
-echo "Добро пожаловать $USERNAM!" > $BANNER_PATH
+echo "Добро пожаловать $USERNAMESSH!" > $BANNER_PATH
 sed -i '/^#Banner none /c\Banner '"$BANNER_PATH" /etc/ssh/sshd_config
 
 # Перезапуск службы SSH для применения изменений
