@@ -1,12 +1,21 @@
 #!/bin/bash
 
 # Задать имя хоста
-hostnamectl set-hostname BR-R
+HOSTMAME="BR-R"
+hostnamectl set-hostname $HOSTMAME
 
 # Настройка сетевых интерфейсов
 echo "Настройка сетевых интерфейсов..."
 INTERFACE_BRANCH="enp0s8"  # Интерфейс в сторону офиса «12 Стульев»
 INTERFACE_TOISP="enp0s3"      # Интерфейс в сторону ISP
+IP="192.168.220.1/27"    # задать ip интерфейсу
+
+# Настройка DHCP сервера
+dhcp_1="192.168.220.0"    #подсеть
+dhcp_2="255.255.255.224"    #маска
+dhcp_3="192.168.220.2 192.168.220.30"    #пул адресов
+dhcp_4="192.168.220.1"    #путь по умолчанию
+dhcp_5="8.8.8.8, 8.8.4.4"    #серверы DNS
 
 # Параметры туннеля
 LOCAL_IP="11.11.0.2"         # Локальный IP-адрес
@@ -23,7 +32,7 @@ USERNAME="Net_Admin"
 PASSWORD="P@\$\$word"
 
 # Расчет и назначение IP-адресов
-nmcli con modify $INTERFACE_BRANCH ipv4.address 192.168.220.1/27
+nmcli con modify $INTERFACE_BRANCH ipv4.address $IP
 nmcli con modify $INTERFACE_BRANCH ipv4.method static
 systemctl restart NetworkManager
 
@@ -40,10 +49,10 @@ default-lease-time 600;
 max-lease-time 7200;
 
 
-subnet 192.168.220.0 netmask 255.255.255.224 {
-    range 192.168.220.2 192.168.220.30;
-    option routers 192.168.220.1;
-    option domain-name-servers 8.8.8.8, 8.8.4.4;
+subnet $dhcp_1 netmask $dhcp_2 {
+    range $dhcp_3;
+    option routers $dhcp_4;
+    option domain-name-servers $dhcp_5;
 }
 EOF
 systemctl enable --now dhcpd
@@ -108,7 +117,7 @@ systemctl enable --now frr
 cat <<EOL > /etc/frr/frr.conf
 frr version 10.1
 frr defaults traditional
-hostname R-Left
+hostname $HOSTMAME
 no ipv6 forwarding
 !
 interface $TUNNEL_NAME
@@ -128,7 +137,7 @@ echo "Файл frr.conf успешно обновлен."
 systemctl restart frr
 
 # Имя пользователя и пароль
-echo "Создание пользователя Net_Admin"
+echo "Создание пользователя $USERNAME"
 # Создание пользователя
 useradd -m -s /bin/bash "$USERNAME"
 echo "$USERNAME:$PASSWORD" | chpasswd
