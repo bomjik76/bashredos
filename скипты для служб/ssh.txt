@@ -30,6 +30,9 @@ echo "AllowUsers Server_Admin" >> /etc/ssh/sshd_config
 echo "Ограничение количества попыток входа..."
 sed -i '/^#MaxAuthTries 6 /c\MaxAuthTries 3' /etc/ssh/sshd_config
 
+# !!!Ограничение по времени аутентификации
+sed -i '/^#LoginGraceTime 2m /c\LoginGraceTime 3m' /etc/ssh/sshd_config
+
 # Настройка баннера SSH
 echo "Настройка SSH баннера..."
 BANNER_PATH="/etc/ssh-banner"
