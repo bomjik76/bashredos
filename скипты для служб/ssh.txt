@@ -2,11 +2,14 @@
 
 
 # Имя пользователя и пароль
-echo "Создание пользователя Server_Admin"
-USERNAME="Server_Admin"
+USERNAME="server_admin"
 PASSWORD="P@ssw0rd"
-USER_ID=1010
+USER_ID="1010"
+PORT="2020"
+TIME="6m"  #Ограничение по времени
+
 # Создание пользователя
+echo "Создание пользователя $USERNAME"
 useradd -m -s /bin/bash -u "$USER_ID" "$USERNAME"
 echo "$USERNAME:$PASSWORD" | chpasswd
 usermod -aG wheel "$USERNAME"
@@ -16,31 +19,29 @@ echo "Пользователь $USERNAME создан и настроен для
 
 # Настройка порта SSH
 echo "Настройка порта SSH..."
-semanage port -a -t ssh_port_t -p tcp 2020
+semanage port -a -t ssh_port_t -p tcp $PORT
 setenforce 0
-sed -i 's/^#Port 22/Port 2020/' /etc/ssh/sshd_config
+sed -i 's/^#Port 22/Port $PORT/' /etc/ssh/sshd_config
 
-# Разрешение подключения только пользователю Server_Admin
-echo "Ограничение входа только для пользователя Server_Admin..."
+# Разрешение подключения только пользователю $USERNAME
+echo "Ограничение входа только для пользователя $USERNAME..."
 sed -i '/^#PermitRootLogin /c\PermitRootLogin no' /etc/ssh/sshd_config
 sed -i '/^#AllowUsers /d' /etc/ssh/sshd_config
-echo "AllowUsers Server_Admin" >> /etc/ssh/sshd_config
+echo "AllowUsers $USERNAM" >> /etc/ssh/sshd_config
 
 # Ограничение количества попыток входа
 echo "Ограничение количества попыток входа..."
 sed -i '/^#MaxAuthTries 6 /c\MaxAuthTries 3' /etc/ssh/sshd_config
 
 # !!!Ограничение по времени аутентификации
-sed -i '/^#LoginGraceTime 2m /c\LoginGraceTime 3m' /etc/ssh/sshd_config
+sed -i '/^#LoginGraceTime 2m /c\LoginGraceTime $TIME' /etc/ssh/sshd_config
 
 # Настройка баннера SSH
 echo "Настройка SSH баннера..."
 BANNER_PATH="/etc/ssh-banner"
-echo "Добро пожаловать Server_Admin!" > $BANNER_PATH
+echo "Добро пожаловать $USERNAM!" > $BANNER_PATH
 sed -i '/^#Banner none /c\Banner '"$BANNER_PATH" /etc/ssh/sshd_config
 
 # Перезапуск службы SSH для применения изменений
 echo "Перезапуск службы SSH..."
 systemctl restart sshd
-
-echo "Настройка завершена. Проверьте подключение по порту 2020 с учетной записью Server_Admin."
