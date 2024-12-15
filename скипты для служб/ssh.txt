@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 # Имя пользователя и пароль
 USERNAME="server_admin"
 PASSWORD="P@ssw0rd"
