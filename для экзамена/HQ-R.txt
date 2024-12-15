@@ -98,7 +98,7 @@ nmcli con add type ip-tunnel ip-tunnel.mode gre con-name $TUNNEL_NAME ifname $TU
 remote $REMOTE_IP local $LOCAL_IP
 nmcli con mod $TUNNEL_NAME ipv4.addresses $TUNNEL_LOCAL_IP
 nmcli con mod $TUNNEL_NAME ipv4.method manual
-#nmcli con mod $TUNNEL_NAME +ipv4.routes "$NETWORK_BRANCH $TUNNEL_REMOTE_IP"
+nmcli con mod $TUNNEL_NAME +ipv4.routes "$NETWORK_BRANCH $TUNNEL_REMOTE_IP"
 nmcli connection modify $TUNNEL_NAME ip-tunnel.ttl 64
 nmcli con up $TUNNEL_NAME
 
