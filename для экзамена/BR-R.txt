@@ -6,7 +6,7 @@ hostnamectl set-hostname $HOSTMAME
 
 # Настройка сетевых интерфейсов
 echo "Настройка сетевых интерфейсов..."
-INTERFACE_BRANCH="enp0s8"  # Интерфейс в сторону офиса «12 Стульев»
+INTERFACE_BRANCH="enp0s8"  # Интерфейс в сторону офиса BRANCH
 INTERFACE_TOISP="enp0s3"      # Интерфейс в сторону ISP
 IP="192.168.220.1/27"    # задать ip интерфейсу
 
