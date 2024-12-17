@@ -4,6 +4,9 @@ HOSTNAME=BR-SRV
 # Задать имя хоста
 hostnamectl set-hostname $HOSTNAME
 
+#Настройка часового пояса
+TIMEZONE="Europe/Moscow"
+
 # Имя пользователя
 USERNAME="net_admin"
 PASSWORD="P@ssw0rd"
@@ -62,3 +65,10 @@ sed -i '/^#Banner none /c\Banner '"$BANNER_PATH" /etc/ssh/sshd_config
 # Перезапуск службы SSH для применения изменений
 echo "Перезапуск службы SSH..."
 systemctl restart sshd
+
+echo "установка chrony"
+dnf install chrony
+echo "настройка chrony"
+timedatectl set-timezone $TIMEZONE
+systemctl restart chronyd
+systemctl enable --now  chronyd
