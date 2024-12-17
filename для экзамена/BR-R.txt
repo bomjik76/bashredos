@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -i
+
 # Задать имя хоста
 HOSTMAME="BR-R"
 hostnamectl set-hostname $HOSTMAME
