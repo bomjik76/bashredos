@@ -3,6 +3,9 @@
 # Задать имя хоста
 hostnamectl set-hostname CLI-R
 
+#Настройка часового пояса
+TIMEZONE="Europe/Moscow"
+
 # Переменные
 SERVER_IP="192.168.220.5"  # Укажите IP-адрес NFS-сервера
 NFS_L_PATH="/shara-1/nfs-L"  # Путь для офиса CLI-L
@@ -78,6 +81,13 @@ yum install -y cups-client
 lpadmin -p "$PRINTER_NAME" -E -v ipp://$SERVER_IP:631/printers/$PRINTER_NAME
 lpadmin -d "$PRINTER_NAME"
 echo "Принтер $PRINTER_NAME настроен как принтер по умолчанию."
+
+echo "установка chrony"
+dnf install chrony
+echo "настройка chrony"
+timedatectl set-timezone $TIMEZONE
+systemctl restart chronyd
+systemctl enable --now  chronyd
 
 
 systemctl restart chronyd
