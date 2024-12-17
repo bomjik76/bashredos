@@ -144,13 +144,6 @@ usermod -aG wheel "$USERNAME"
 # Настройка sudo без пароля
 echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USERNAME"
 echo "Пользователь $USERNAME создан и настроен для использования sudo без пароля."
- 
-echo "установка chrony"
-dnf install chrony
-echo "настройка chrony"
-timedatectl set-timezone Europe/Moscow
-systemctl restart chronyd
-systemctl enable --now  chronyd
 
 dnf install -y nfs-utils
 
