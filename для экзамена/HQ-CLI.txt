@@ -1,16 +1,22 @@
 #!/bin/bash
 
+set -e
+
+HOSTNAME="HQ-CLI"
 # Задать имя хоста
-hostnamectl set-hostname CLI-R
+hostnamectl set-hostname $HOSTNAME
+
+SERVER_IP="172.16.220.6"  # Укажите IP-адрес сервера
+PRINTER_NAME="Virtual_PDF_Printer"
 
 #Настройка часового пояса
 TIMEZONE="Europe/Moscow"
 
 # Переменные
 SERVER_IP="192.168.220.5"  # Укажите IP-адрес NFS-сервера
-NFS_L_PATH="/shara-1/nfs-L"  # Путь для офиса CLI-L
-NFS_R_PATH="/shara-2/nfs-R"  # Путь для офиса CLI-R
-MOUNT_DIR="/media"  # Общая папка для монтирования
+NFS_L_PATH="/shara-1/nfs-L"  # Путь для офиса 
+NFS_R_PATH="/shara-2/nfs-R"  # Путь для офиса 
+MOUNT_DIR="/mnt/zz"  # Общая папка для монтирования
 CLIENT_NAME=$(hostname)
 
 #файловый сервер
@@ -58,22 +64,6 @@ fi
 
 echo "Настройка завершена."
 
-
-echo "установка chrony"
-dnf install chrony
-
-echo "настройка chrony"
-timedatectl set-timezone Europe/Moscow
-sed -i 's/server ntp1.vniiftri.ru iburst/server 172.16.220.1 iburst/' /etc/chrony.conf
-sed -i 's/server ntp2.vniiftri.ru iburst/#server ntp2.vniiftri.ru iburst/' /etc/chrony.conf
-sed -i 's/server ntp3.vniiftri.ru iburst/#server ntp3.vniiftri.ru iburst/' /etc/chrony.conf
-sed -i 's/server ntp4.vniiftri.ru iburst/#server ntp4.vniiftri.ru iburst/' /etc/chrony.conf
-systemctl enable --now chronyd
-
-echo "Устанавливаем и настраиваем CUPS..."
-SERVER_IP="172.16.220.6"  # Укажите IP-адрес сервера
-PRINTER_NAME="Virtual_PDF_Printer"
-
 echo "Подключение к принт-серверу $SERVER_IP..."
 # Установка клиента CUPS
 yum install -y cups-client
@@ -88,6 +78,3 @@ echo "настройка chrony"
 timedatectl set-timezone $TIMEZONE
 systemctl restart chronyd
 systemctl enable --now  chronyd
-
-
-systemctl restart chronyd
