@@ -19,6 +19,7 @@ dhcp_2="255.255.255.224"    #маска
 dhcp_3="192.168.220.2 192.168.220.30"    #пул адресов
 dhcp_4="192.168.220.1"    #путь по умолчанию
 dhcp_5="8.8.8.8, 8.8.4.4"    #серверы DNS
+domain="hq.work"    #DNS
 
 # Параметры туннеля
 LOCAL_IP="11.11.0.2"         # Локальный IP-адрес
@@ -52,6 +53,7 @@ subnet $dhcp_1 netmask $dhcp_2 {
     range $dhcp_3;
     option routers $dhcp_4;
     option domain-name-servers $dhcp_5;
+    option domain-name "$domain";
 }
 EOF
 systemctl enable --now dhcpd
