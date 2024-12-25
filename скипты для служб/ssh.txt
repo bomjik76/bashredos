@@ -20,26 +20,25 @@ echo "Пользователь $USERNAMESSH создан и настроен д�
 echo "Настройка порта SSH..."
 semanage port -a -t ssh_port_t -p tcp $PORT
 setenforce 0
-sed -i 's/^#Port 22/Port $PORT/' /etc/ssh/sshd_config
+sed -i '20 a $PORT' /etc/ssh/sshd_config
 
 # Разрешение подключения только пользователю $USERNAMESSH
 echo "Ограничение входа только для пользователя $USERNAMESSH..."
-sed -i '/^#PermitRootLogin /c\PermitRootLogin no' /etc/ssh/sshd_config
-sed -i '/^#AllowUsers /d' /etc/ssh/sshd_config
-echo "AllowUsers $USERNAMESSH" >> /etc/ssh/sshd_config
+sed -i '21 a PermitRootLogin no' /etc/ssh/sshd_config
+sed -i '22 a AllowUsers $USERNAMESSH' /etc/ssh/sshd_config
 
 # Ограничение количества попыток входа
 echo "Ограничение количества попыток входа..."
-sed -i '/^#MaxAuthTries 6 /c\MaxAuthTries 3' /etc/ssh/sshd_config
+sed -i '23 a MaxAuthTries 3' /etc/ssh/sshd_config
 
 # !!!Ограничение по времени аутентификации
-sed -i '/^#LoginGraceTime 2m /c\LoginGraceTime $TIME' /etc/ssh/sshd_config
+sed -i '24 a LoginGraceTime $TIME' /etc/ssh/sshd_config
 
 # Настройка баннера SSH
 echo "Настройка SSH баннера..."
 BANNER_PATH="/etc/ssh-banner"
 echo "Добро пожаловать $USERNAMESSH!" > $BANNER_PATH
-sed -i '/^#Banner none /c\Banner '"$BANNER_PATH" /etc/ssh/sshd_config
+sed -i '25 a Banner '"$BANNER_PATH" /etc/ssh/sshd_config
 
 # Перезапуск службы SSH для применения изменений
 echo "Перезапуск службы SSH..."
