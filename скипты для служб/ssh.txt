@@ -25,7 +25,7 @@ sed -i '20 a $PORT' /etc/ssh/sshd_config
 # Разрешение подключения только пользователю $USERNAMESSH
 echo "Ограничение входа только для пользователя $USERNAMESSH..."
 sed -i '21 a PermitRootLogin no' /etc/ssh/sshd_config
-sed -i '22 a AllowUsers $USERNAMESSH' /etc/ssh/sshd_config
+sed -i "22 a AllowUsers $USERNAMESSH" /etc/ssh/sshd_config
 
 # Ограничение количества попыток входа
 echo "Ограничение количества попыток входа..."
