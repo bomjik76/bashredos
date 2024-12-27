@@ -182,7 +182,7 @@ echo "Пользователь $USERNAMESSH создан и настроен д�
 echo "Настройка порта SSH..."
 semanage port -a -t ssh_port_t -p tcp $PORT
 setenforce 0
-sed -i 's/^#Port 22/Port $PORT/' /etc/ssh/sshd_config
+sed -i 's/#Port 22/Port $PORT/' /etc/ssh/sshd_config
 
 # Разрешение подключения только пользователю $USERNAMESSH
 echo "Ограничение входа только для пользователя $USERNAMESSH..."
@@ -195,7 +195,7 @@ echo "Ограничение количества попыток входа..."
 sed -i '/^#MaxAuthTries 6 /c\MaxAuthTries 3' /etc/ssh/sshd_config
 
 # !!!Ограничение по времени аутентификации
-sed -i '/#LoginGraceTime 2m /LoginGraceTime $TIME' /etc/ssh/sshd_config
+sed -i 's/#LoginGraceTime 2m /LoginGraceTime $TIME' /etc/ssh/sshd_config
 
 # Настройка баннера SSH
 echo "Настройка SSH баннера..."
