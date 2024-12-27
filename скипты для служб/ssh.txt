@@ -6,6 +6,7 @@ PASSWORDSSH="P@ssw0rd"
 USER_ID="1010"
 PORT="2020"
 TIME="6m"  #Ограничение по времени
+POPITKA="3"            #Ограничение количества попыток входа
 
 # Создание пользователя
 echo "Создание пользователя $USERNAMESSH"
@@ -29,7 +30,7 @@ sed -i "22 a AllowUsers $USERNAMESSH" /etc/ssh/sshd_config
 
 # Ограничение количества попыток входа
 echo "Ограничение количества попыток входа..."
-sed -i "23 a MaxAuthTries 3" /etc/ssh/sshd_config
+sed -i "23 a MaxAuthTries $POPITKA" /etc/ssh/sshd_config
 
 # !!!Ограничение по времени аутентификации
 sed -i "24 a LoginGraceTime $TIME" /etc/ssh/sshd_config
