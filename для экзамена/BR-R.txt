@@ -195,7 +195,7 @@ echo "Ограничение количества попыток входа..."
 sed -i '/^#MaxAuthTries 6 /c\MaxAuthTries 3' /etc/ssh/sshd_config
 
 # !!!Ограничение по времени аутентификации
-sed -i '/#LoginGraceTime 2m /c\LoginGraceTime $TIME' /etc/ssh/sshd_config
+sed -i '/#LoginGraceTime 2m /LoginGraceTime $TIME' /etc/ssh/sshd_config
 
 # Настройка баннера SSH
 echo "Настройка SSH баннера..."
