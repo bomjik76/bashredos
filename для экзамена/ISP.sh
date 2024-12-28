@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sed -i
+set -e
 
 HOSTNAME="isp"
 # Задать имя хоста

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 HOSTNAME="srv-r.firma.rtk."
 # Задать имя хоста
 hostnamectl set-hostname $HOSTNAME
@@ -64,4 +66,24 @@ systemctl restart nfs-server
 systemctl status nfs-server
 
 echo "Конфигурация завершена. RAID массив смонтирован в $MOUNT_DIR и NFS настроен для $NFS_DIR."
+
+#CUPS
+echo "Устанавливаем и настраиваем CUPS..."
+# Установка CUPS
+yum install -y cups
+# Включение и запуск службы CUPS
+systemctl enable cups
+systemctl start cups
+# Открытие доступа через локальную сеть
+cupsd_conf="/etc/cups/cupsd.conf"
+sed -i 's/<Location \/>/<Location \/>\n  Allow all\n/g' $cupsd_conf
+sed -i "s/Listen localhost:631/Listen 0.0.0.0:631/" $cupsd_conf
+sed -i 's/<Location \/admin>/<Location \/admin>\n  Allow all\n/g' $cupsd_conf
+# Перезапуск службы
+systemctl restart cups
+# Создание виртуального PDF-принтера
+lpadmin -p Virtual_PDF_Printer -E -v cups-pdf:/ -m drv:///sample.drv/generic.ppd
+lpadmin -d Virtual_PDF_Printer
+echo "CUPS настроен. Виртуальный PDF-принтер опубликован."
+
 

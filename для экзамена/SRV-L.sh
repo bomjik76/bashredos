@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 HOSTNAME="srv-l.firma.rtk."
 # Задать имя хоста
 hostnamectl set-hostname $HOSTNAME

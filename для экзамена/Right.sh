@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -i
+set -e
 
 # Задать имя хоста
 HOSTMAME="r-right.firma.rtk."
