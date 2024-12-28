@@ -1,17 +1,26 @@
 #!/bin/bash
-HOSTNAME="ISP"
+
+sed -i
+
+HOSTNAME="isp"
 # Задать имя хоста
 hostnamectl set-hostname $HOSTNAME
 
 # Настройка сетевых интерфейсов
 echo "Настройка сетевых интерфейсов..."
-INTERFACE_3="enp0s9"  # Интерфейс в сторону офиса BR
-INTERFACE_2="enp0s8"  # Интерфейс в сторону офиса HQ
 INTERFACE_1="enp0s3"      # Интерфейс в сторону магистрального провайдера
+INTERFACE_2="enp0s8"  # Интерфейс в сторону офиса Left
+INTERFACE_3="enp0s9"  # Интерфейс в сторону офиса Right
 IP2="11.11.0.1/24"
 IP3="22.22.0.1/24"
+
 #Настройка часового пояса
 TIMEZONE="Europe/Moscow"
+
+# admin
+USERNAME="admin"
+PASSWORD="P@ssw0rd"
+USER_ID="1010"
 
 # Назначение IP-адресов
 nmcli con modify $INTERFACE_2 ipv4.address $IP2
@@ -58,11 +67,15 @@ systemctl enable --now nftables
 echo "Включение IP-перенаправления..."
 echo net.ipv4.ip_forward=1 > /etc/sysctl.conf
 sysctl -p
-echo "Настройка завершена."
 
-echo "установка chrony"
-dnf install chrony
-echo "настройка chrony"
+echo "Настройка timezone"
 timedatectl set-timezone $TIMEZONE
-systemctl restart chronyd
-systemctl enable --now  chronyd
+
+# Имя пользователя и пароль
+echo "Создание пользователя $USERNAME"
+# Создание пользователя
+useradd -m -s /bin/bash -u "$USER_ID" "$USERNAME"
+echo "$USERNAME:$PASSWORD" | chpasswd
+usermod -aG wheel "$USERNAME"
+
+echo "Настройка завершена."

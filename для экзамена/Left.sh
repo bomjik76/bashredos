@@ -3,7 +3,7 @@
 set -i
 
 # Задать имя хоста
-HOSTMAME="BR-R"
+HOSTMAME="r-left.firma.rtk."
 hostnamectl set-hostname $HOSTMAME
 
 #Настройка часового пояса
@@ -11,8 +11,8 @@ TIMEZONE="Europe/Moscow"
 
 # Настройка сетевых интерфейсов
 echo "Настройка сетевых интерфейсов..."
-INTERFACE_BRANCH="enp0s8"  # Интерфейс в сторону офиса BRANCH
 INTERFACE_TOISP="enp0s3"      # Интерфейс в сторону ISP
+INTERFACE_Left="enp0s8"  # Интерфейс в сторону офиса LeftP
 IP="192.168.220.1/27"    # задать ip интерфейсу
 
 # Настройка DHCP сервера
@@ -20,8 +20,8 @@ dhcp_1="192.168.220.0"    #подсеть
 dhcp_2="255.255.255.224"    #маска
 dhcp_3="192.168.220.2 192.168.220.30"    #пул адресов
 dhcp_4="192.168.220.1"    #путь по умолчанию
-dhcp_5="8.8.8.8, 8.8.4.4"    #серверы DNS
-domain="hq.work"    #DNS
+dhcp_5="10.10.10.1"    #сервер SRV-L
+domain="firma.rtk"    #DNS
 
 # Параметры туннеля
 LOCAL_IP="11.11.0.2"         # Локальный IP-адрес
@@ -29,24 +29,26 @@ REMOTE_IP="22.22.0.2"        # Удалённый IP-адрес
 TUNNEL_LOCAL_IP="10.10.10.1/30"     # Локальный IP туннеля
 TUNNEL_REMOTE_IP="10.10.10.2"    # Удалённый IP туннеля
 TUNNEL_NAME="gre-tunnel0"      # Имя туннеля
-NETWORK_BRANCH="192.168.220.0/27"
-NETWORK_HQ="172.16.220.0/27"
+NETWORK_Left="192.168.220.0/27"
+NETWORK_Right="172.16.220.0/27"
 NETWORK_TUNNEL="10.10.10.0/30"
 
-# Имя пользователя
-USERNAME="net_admin"
+# admin
+USERNAME="admin"
 PASSWORD="P@ssw0rd"
-
-# Имя пользователя для ssh и пароль
-USERNAMESSH="server_admin"
-PASSWORDSSH="P@ssw0rd"
 USER_ID="1010"
-PORT="2020"
-TIME="6m"  #Ограничение по времени
+
+# network_admin
+USERNAMESSH="network_admin"
+PASSWORDSSH="P@ssw0rd"
+USER1_ID="1030"
+PORT="2022"
+TIME="5m"       #Ограничение по времени
+POPITKA="3"     #Ограничение количества попыток входа
 
 # Расчет и назначение IP-адресов
-nmcli con modify $INTERFACE_BRANCH ipv4.address $IP
-nmcli con modify $INTERFACE_BRANCH ipv4.method static
+nmcli con modify $INTERFACE_Left ipv4.address $IP
+nmcli con modify $INTERFACE_Left ipv4.method static
 systemctl restart NetworkManager
 
 # Включение пересылки пакетов
@@ -74,7 +76,6 @@ systemctl enable --now dhcpd
 # Настройка nftables
 dnf install -y nftables
 echo "Настройка nftables..."
-
 # Создаем файл конфигурации и записываем правила
 CONFIG_FILE1="/etc/nftables/r-left.nft"
 echo "Создаем файл конфигурации $CONFIG_FILE..."
@@ -88,11 +89,9 @@ table inet nat {
 }
 EOF
 sed -i "s/oifname /oifname $INTERFACE_TOISP /" $CONFIG_FILE1
-
 # Добавляем строку include в файл /etc/sysconfig/nftables.conf
 CONFIG_FILE2="/etc/sysconfig/nftables.conf"
 INCLUDE_LINE='include "/etc/nftables/r-left.nft"'
-
 echo "Добавляем строку '$INCLUDE_LINE' в файл $CONFIG_FILE..."
 if ! grep -Fxq "$INCLUDE_LINE" "$CONFIG_FILE2"; then
     echo "$INCLUDE_LINE" | sudo tee -a "$CONFIG_FILE2"
@@ -112,7 +111,7 @@ nmcli con add type ip-tunnel ip-tunnel.mode gre con-name $TUNNEL_NAME ifname $TU
 remote $REMOTE_IP local $LOCAL_IP
 nmcli con mod $TUNNEL_NAME ipv4.addresses $TUNNEL_LOCAL_IP
 nmcli con mod $TUNNEL_NAME ipv4.method manual
-nmcli con mod $TUNNEL_NAME +ipv4.routes "$NETWORK_HQ $TUNNEL_REMOTE_IP"
+nmcli con mod $TUNNEL_NAME +ipv4.routes "$NETWORK_Right $TUNNEL_REMOTE_IP"
 nmcli connection modify $TUNNEL_NAME ip-tunnel.ttl 64
 nmcli con up $TUNNEL_NAME
 
@@ -135,43 +134,31 @@ hostname $HOSTMAME
 no ipv6 forwarding
 !
 interface $TUNNEL_NAME
- ip ospf authentication
- ip ospf authentication-key password
- no ip ospf passive
+ip ospf authentication
+ip ospf authentication-key password
+no ip ospf passive
 exit
 !
 router ospf
- passive-interface default
- network $NETWORK_TUNNEL area 0
- network $NETWORK_BRANCH area 0
+passive-interface default
+network $NETWORK_TUNNEL area 0
+network $NETWORK_Left area 0
 exit
 !
 EOL
 echo "Файл frr.conf успешно обновлен."
 systemctl restart frr
 
-# Имя пользователя и пароль
 echo "Создание пользователя $USERNAME"
 # Создание пользователя
-useradd -m -s /bin/bash "$USERNAME"
+useradd -m -s /bin/bash -u "$USER_ID" "$USERNAME"
 echo "$USERNAME:$PASSWORD" | chpasswd
 usermod -aG wheel "$USERNAME"
-# Настройка sudo без пароля
-echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USERNAME"
-echo "Пользователь $USERNAME создан и настроен для использования sudo без пароля."
- 
-echo "установка chrony"
-dnf install chrony
-echo "настройка chrony"
-timedatectl set-timezone $TIMEZONE
-systemctl restart chronyd
-systemctl enable --now  chronyd
+echo "Пользователь $USERNAME создан."
 
-dnf install -y nfs-utils
-
-# Создание пользователя
+# Создание пользователя SSH
 echo "Создание пользователя $USERNAMESSH"
-useradd -m -s /bin/bash -u "$USER_ID" "$USERNAMESSH"
+useradd -m -s /bin/bash -u "$USER1_ID" "$USERNAMESSH"
 echo "$USERNAMESSH:$PASSWORDSSH" | chpasswd
 usermod -aG wheel "$USERNAMESSH"
 # Настройка sudo без пароля
@@ -182,68 +169,24 @@ echo "Пользователь $USERNAMESSH создан и настроен д�
 echo "Настройка порта SSH..."
 semanage port -a -t ssh_port_t -p tcp $PORT
 setenforce 0
-sed -i 's/#Port 22/Port $PORT/' /etc/ssh/sshd_config
-
+sed -i "20 a Port $PORT" /etc/ssh/sshd_config
 # Разрешение подключения только пользователю $USERNAMESSH
 echo "Ограничение входа только для пользователя $USERNAMESSH..."
-sed -i '/^#PermitRootLogin /c\PermitRootLogin no' /etc/ssh/sshd_config
-sed -i '/^#AllowUsers /d' /etc/ssh/sshd_config
-echo "AllowUsers $USERNAMESSH" >> /etc/ssh/sshd_config
-
+sed -i "21 a PermitRootLogin no" /etc/ssh/sshd_config
+sed -i "22 a AllowUsers $USERNAMESSH" /etc/ssh/sshd_config
 # Ограничение количества попыток входа
 echo "Ограничение количества попыток входа..."
-sed -i '/^#MaxAuthTries 6 /c\MaxAuthTries 3' /etc/ssh/sshd_config
-
-# !!!Ограничение по времени аутентификации
-sed -i "s/#LoginGraceTime 2m / LoginGraceTime $TIME /' /etc/ssh/sshd_config
-
+sed -i "23 a MaxAuthTries $POPITKA" /etc/ssh/sshd_config
+# Ограничение по времени аутентификации
+sed -i "24 a LoginGraceTime $TIME" /etc/ssh/sshd_config
 # Настройка баннера SSH
 echo "Настройка SSH баннера..."
 BANNER_PATH="/etc/ssh-banner"
 echo "Добро пожаловать $USERNAMESSH!" > $BANNER_PATH
-sed -i '/^#Banner none /c\Banner '"$BANNER_PATH" /etc/ssh/sshd_config
+sed -i "25 a Banner $BANNER_PATH" /etc/ssh/sshd_config
 
 # Перезапуск службы SSH для применения изменений
 echo "Перезапуск службы SSH..."
 systemctl restart sshd
-
-# Межсетевой экран
-nft flush ruleset
-# Создание таблицы фильтрации
-nft add table inet filter
-# Создание цепочек
-nft add chain inet filter input { type filter hook input priority 0 \; }
-nft add chain inet filter forward { type filter hook forward priority 0 \; }
-nft add chain inet filter output { type filter hook output priority 0 \; }
-# Базовые политики: блокировать всё
-nft add rule inet filter input drop
-nft add rule inet filter forward drop
-nft add rule inet filter output accept
-# Разрешить локальные loopback соединения
-nft add rule inet filter input iif "lo" accept
-nft add rule inet filter output oif "lo" accept
-# Разрешить установленные и связанные соединения
-nft add rule inet filter input ct state established,related accept
-# Разрешить ICMP (ping)
-nft add rule inet filter input ip protocol icmp accept
-nft add rule inet filter input ip6 nexthdr icmpv6 accept
-# Разрешить SSH
-nft add rule inet filter input tcp dport 22 accept
-# Разрешить HTTP и HTTPS
-nft add rule inet filter input tcp dport 80 accept
-nft add rule inet filter input tcp dport 443 accept
-# Разрешить DNS
-nft add rule inet filter input udp dport 53 accept
-nft add rule inet filter input tcp dport 53 accept
-# Разрешить NTP
-nft add rule inet filter input udp dport 123 accept
-# Запретить всё остальное (входящие подключения)
-# Это уже задано как базовая политика: drop для input
-# Сохранение конфигурации
-nft list ruleset > /etc/nftables.conf
-# Убедимся, что nftables запускается при загрузке
-systemctl enable nftables
-systemctl restart nftables
-echo "Межсетевой экран настроен!"
 
 echo "Настройка завершена."

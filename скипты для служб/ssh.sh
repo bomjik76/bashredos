@@ -5,8 +5,8 @@ USERNAMESSH="server_admin"
 PASSWORDSSH="P@ssw0rd"
 USER_ID="1010"
 PORT="2020"
-TIME="6m"  #Ограничение по времени
-POPITKA="3"            #Ограничение количества попыток входа
+TIME="6m"       #Ограничение по времени
+POPITKA="3"     #Ограничение количества попыток входа
 
 # Создание пользователя
 echo "Создание пользователя $USERNAMESSH"
@@ -32,7 +32,7 @@ sed -i "22 a AllowUsers $USERNAMESSH" /etc/ssh/sshd_config
 echo "Ограничение количества попыток входа..."
 sed -i "23 a MaxAuthTries $POPITKA" /etc/ssh/sshd_config
 
-# !!!Ограничение по времени аутентификации
+# Ограничение по времени аутентификации
 sed -i "24 a LoginGraceTime $TIME" /etc/ssh/sshd_config
 
 # Настройка баннера SSH
