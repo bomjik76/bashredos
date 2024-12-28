@@ -2,10 +2,11 @@
 
 set -e
 
-HOSTNAME="HQ-CLI"
+HOSTNAME="cli-l.firma.rtk."
 # Задать имя хоста
 hostnamectl set-hostname $HOSTNAME
 
+#Настройка CUPS
 SERVER_IP="172.16.220.6"  # Укажите IP-адрес сервера
 PRINTER_NAME="Virtual_PDF_Printer"
 
@@ -13,56 +14,40 @@ PRINTER_NAME="Virtual_PDF_Printer"
 TIMEZONE="Europe/Moscow"
 
 # Переменные
-SERVER_IP="192.168.220.5"  # Укажите IP-адрес NFS-сервера
-NFS_L_PATH="/shara-1/nfs-L"  # Путь для офиса 
-NFS_R_PATH="/shara-2/nfs-R"  # Путь для офиса 
-MOUNT_DIR="/mnt/zz"  # Общая папка для монтирования
-CLIENT_NAME=$(hostname)
+NFS_SERVER="192.168.1.1"  # IP адрес сервера NFS
+NFS_EXPORT="/obmen/nfs"  # Экспортированная папка на сервере
+MOUNT_DIR="/mnt/nfs"     # Точка монтирования на клиенте
 
-#файловый сервер
-echo "Настройка подключения к файловому серверу"
-# Создаем папки для монтирования
-echo "Создаем папку $MOUNT_DIR для монтирования"
+# admin
+USERNAME="admin"
+PASSWORD="P@ssw0rd"
+USER_ID="1010"
+
+# Имя пользователя и пароль
+echo "Создание пользователя $USERNAME"
+# Создание пользователя
+useradd -m -s /bin/bash -u "$USER_ID" "$USERNAME"
+echo "$USERNAME:$PASSWORD" | chpasswd
+usermod -aG wheel "$USERNAME"
+echo "Пользователь $USERNAME создан."
+
+# Устанавливаем необходимые пакеты
+dnf install -y nfs-utils
+# Создаем точку монтирования
 mkdir -p $MOUNT_DIR
-
-if [[ $CLIENT_NAME == "CLI-L" ]]; then
-    TARGET_PATH="$MOUNT_DIR/nfs-L"
-    NFS_PATH="$SERVER_IP:$NFS_L_PATH"
-elif [[ $CLIENT_NAME == "CLI-R" ]]; then
-    TARGET_PATH="$MOUNT_DIR/nfs-R"
-    NFS_PATH="$SERVER_IP:$NFS_R_PATH"
-else
-    echo "Имя хоста ($CLIENT_NAME) не распознано как CLI-L или CLI-R. Проверьте настройки."
-    exit 1
+# Добавляем запись в /etc/fstab для автомонтирования
+if ! grep -q "$NFS_SERVER:$NFS_EXPORT" /etc/fstab; then
+    echo "$NFS_SERVER:$NFS_EXPORT $MOUNT_DIR nfs defaults 0 0" >> /etc/fstab
 fi
-
-# Убедитесь, что nfs-utils установлен
-if ! command -v mount.nfs &> /dev/null; then
-    echo "Утилита nfs-utils не установлена. Устанавливаем..."
-    yum install -y nfs-utils
-fi
-
-# Создаем папку для монтирования
-echo "Создаем папку $TARGET_PATH"
-mkdir -p $TARGET_PATH
-
-# Настраиваем fstab для автоматического монтирования
-echo "Настраиваем автоматическое монтирование в /etc/fstab"
-echo "$NFS_PATH $TARGET_PATH nfs defaults 0 0" >> /etc/fstab
-
-# Монтируем
-echo "Монтируем $NFS_PATH в $TARGET_PATH"
+# Монтируем экспортированную папку
 mount -a
-
-# Проверяем монтирование
-if mountpoint -q $TARGET_PATH; then
-    echo "Монтирование выполнено успешно: $TARGET_PATH"
+# Проверяем статус монтирования
+if mountpoint -q $MOUNT_DIR; then
+    echo "NFS успешно смонтирован в $MOUNT_DIR."
 else
-    echo "Ошибка монтирования. Проверьте настройки."
+    echo "Ошибка монтирования NFS. Проверьте настройки."
     exit 1
 fi
-
-echo "Настройка завершена."
 
 echo "Подключение к принт-серверу $SERVER_IP..."
 # Установка клиента CUPS
@@ -72,9 +57,5 @@ lpadmin -p "$PRINTER_NAME" -E -v ipp://$SERVER_IP:631/printers/$PRINTER_NAME
 lpadmin -d "$PRINTER_NAME"
 echo "Принтер $PRINTER_NAME настроен как принтер по умолчанию."
 
-echo "установка chrony"
-dnf install chrony
-echo "настройка chrony"
+echo "настройка timezone"
 timedatectl set-timezone $TIMEZONE
-systemctl restart chronyd
-systemctl enable --now  chronyd
