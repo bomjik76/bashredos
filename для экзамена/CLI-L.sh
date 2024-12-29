@@ -7,7 +7,7 @@ HOSTNAME="cli-l.firma.rtk."
 hostnamectl set-hostname $HOSTNAME
 
 #Настройка CUPS
-SERVER_IP="172.16.220.6"  # Укажите IP-адрес сервера
+SERVER_IP="172.16.220.6"  # Укажите IP-адрес CUPS
 PRINTER_NAME="Virtual_PDF_Printer"
 
 #Настройка часового пояса
@@ -62,3 +62,5 @@ timedatectl set-timezone $TIMEZONE
 
 echo "тык тык пошел нахуя яндекс браузер"
 dnf install yandex-browser-stable
+
+echo "Настройка завершена."

@@ -86,4 +86,4 @@ lpadmin -p Virtual_PDF_Printer -E -v cups-pdf:/ -m drv:///sample.drv/generic.ppd
 lpadmin -d Virtual_PDF_Printer
 echo "CUPS настроен. Виртуальный PDF-принтер опубликован."
 
-
+echo "Настройка завершена."

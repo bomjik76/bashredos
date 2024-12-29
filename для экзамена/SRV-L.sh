@@ -24,3 +24,5 @@ echo "Пользователь $USERNAME создан."
 
 echo "настройка timezone"
 timedatectl set-timezone $TIMEZONE
+
+echo "Настройка завершена."

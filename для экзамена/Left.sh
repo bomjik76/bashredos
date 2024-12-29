@@ -12,8 +12,8 @@ TIMEZONE="Europe/Moscow"
 # Настройка сетевых интерфейсов
 echo "Настройка сетевых интерфейсов..."
 INTERFACE_TOISP="enp0s3"      # Интерфейс в сторону ISP
-INTERFACE_Left="enp0s8"  # Интерфейс в сторону офиса LeftP
-IP="192.168.220.1/27"    # задать ip интерфейсу
+INTERFACE_Left="enp0s8"  # Интерфейс в сторону офиса Left
+IP="192.168.220.1/27"    # задать ip интерфейсу enp0s8
 
 # Настройка DHCP сервера
 dhcp_1="192.168.220.0"    #подсеть
@@ -46,7 +46,7 @@ PORT="2022"
 TIME="5m"       #Ограничение по времени
 POPITKA="3"     #Ограничение количества попыток входа
 
-# Расчет и назначение IP-адресов
+# назначение IP-адресов
 nmcli con modify $INTERFACE_Left ipv4.address $IP
 nmcli con modify $INTERFACE_Left ipv4.method static
 systemctl restart NetworkManager
@@ -188,5 +188,15 @@ sed -i "25 a Banner $BANNER_PATH" /etc/ssh/sshd_config
 # Перезапуск службы SSH для применения изменений
 echo "Перезапуск службы SSH..."
 systemctl restart sshd
+
+#Настройка межсетевого экрана
+nft flush ruleset
+nft add table ip filter 
+nft add chain ip filter INPUT { type filter hook input priority 0 \; policy drop \;   }
+nft add rule ip filter INPUT iifname lo counter accept
+nft add rule ip filter INPUT iifname $INTERFACE_Left counter accept
+nft add rule ip filter INPUT iifname $INTERFACE_TOISP  ip protocol tcp  tcp dport { 80,$PORT,443 } counter accept
+nft add rule ip filter INPUT iifname $INTERFACE_TOISP  ip protocol udp  udp dport 53 counter accept
+nft add rule inet filter output ip protocol icmp accept
 
 echo "Настройка завершена."

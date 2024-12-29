@@ -17,10 +17,6 @@ IP3="22.22.0.1/24"
 #Настройка часового пояса
 TIMEZONE="Europe/Moscow"
 
-# admin
-USERNAME="admin"
-PASSWORD="P@ssw0rd"
-USER_ID="1010"
 
 # Назначение IP-адресов
 nmcli con modify $INTERFACE_2 ipv4.address $IP2
@@ -70,12 +66,5 @@ sysctl -p
 
 echo "Настройка timezone"
 timedatectl set-timezone $TIMEZONE
-
-# Имя пользователя и пароль
-echo "Создание пользователя $USERNAME"
-# Создание пользователя
-useradd -m -s /bin/bash -u "$USER_ID" "$USERNAME"
-echo "$USERNAME:$PASSWORD" | chpasswd
-usermod -aG wheel "$USERNAME"
 
 echo "Настройка завершена."
