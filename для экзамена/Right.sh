@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -e
 
 # Задать имя хоста
 HOSTMAME="r-right.firma.rtk."
@@ -13,16 +12,16 @@ TIMEZONE="Europe/Moscow"
 echo "Настройка сетевых интерфейсов..."
 INTERFACE_TOISP="enp0s3"      # Интерфейс в сторону ISP
 INTERFACE_Right="enp0s8"  # Интерфейс в сторону офиса Right
-IP="10.10.10.1/25"    # задать ip интерфейсу enp0s8
+IP="22.22.22.1/25"    # задать ip интерфейсу enp0s8
 
 # Параметры туннеля
-LOCAL_IP="172.16.2.1"         # Локальный IP-адрес
-REMOTE_IP="172.16.1.1"        # Удалённый IP-адрес
-TUNNEL_LOCAL_IP="10.10.10.1/30"     # Локальный IP туннеля
-TUNNEL_REMOTE_IP="10.10.10.2"    # Удалённый IP туннеля
+LOCAL_IP="172.16.5.2"         # Локальный IP-адрес
+REMOTE_IP="172.16.4.2"        # Удалённый IP-адрес
+TUNNEL_LOCAL_IP="10.10.10.2/30"     # Локальный IP туннеля
+TUNNEL_REMOTE_IP="10.10.10.1"    # Удалённый IP туннеля
 TUNNEL_NAME="gre-tunnel0"      # Имя туннеля
 NETWORK_Left="11.11.11.0/27"
-NETWORK_Right="10.10.10.0/25"
+NETWORK_Right="22.22.22.0/25"
 NETWORK_TUNNEL="10.10.10.0/30"
 
 # admin
@@ -52,8 +51,8 @@ sysctl -p
 dnf install -y nftables
 echo "Настройка nftables..."
 # Создаем файл конфигурации и записываем правила
-CONFIG_FILE1="/etc/nftables/r-left.nft"
-echo "Создаем файл конфигурации $CONFIG_FILE..."
+CONFIG_FILE1="/etc/nftables/r-right.nft"
+echo "Создаем файл конфигурации $CONFIG_FILE1..."
 touch $CONFIG_FILE1
 cat > $CONFIG_FILE1 << 'EOF'
 table inet nat {
@@ -67,7 +66,7 @@ sed -i "s/oifname /oifname $INTERFACE_TOISP /" $CONFIG_FILE1
 # Добавляем строку include в файл /etc/sysconfig/nftables.conf
 CONFIG_FILE2="/etc/sysconfig/nftables.conf"
 INCLUDE_LINE='include "/etc/nftables/r-right.nft"'
-echo "Добавляем строку '$INCLUDE_LINE' в файл $CONFIG_FILE..."
+echo "Добавляем строку '$INCLUDE_LINE' в файл $CONFIG_FILE2..."
 if ! grep -Fxq "$INCLUDE_LINE" "$CONFIG_FILE2"; then
     echo "$INCLUDE_LINE" | sudo tee -a "$CONFIG_FILE2"
     echo "Строка добавлена."

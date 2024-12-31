@@ -7,14 +7,14 @@ HOSTNAME="cli-l.firma.rtk."
 hostnamectl set-hostname $HOSTNAME
 
 #Настройка CUPS
-SERVER_IP="172.16.220.6"  # Укажите IP-адрес CUPS
+SERVER_IP="22.22.22.2"  # Укажите IP-адрес CUPS
 PRINTER_NAME="Virtual_PDF_Printer"
 
 #Настройка часового пояса
 TIMEZONE="Europe/Moscow"
 
 # Переменные
-NFS_SERVER="192.168.1.1"  # IP адрес сервера NFS
+NFS_SERVER="22.22.22.2"  # IP адрес сервера NFS
 NFS_EXPORT="/obmen/nfs"  # Экспортированная папка на сервере
 MOUNT_DIR="/mnt/nfs"     # Точка монтирования на клиенте
 

@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 # Задать имя хоста
 HOSTMAME="r-left.firma.rtk."
 hostnamectl set-hostname $HOSTMAME
@@ -13,24 +11,24 @@ TIMEZONE="Europe/Moscow"
 echo "Настройка сетевых интерфейсов..."
 INTERFACE_TOISP="enp0s3"      # Интерфейс в сторону ISP
 INTERFACE_Left="enp0s8"  # Интерфейс в сторону офиса Left
-IP="192.168.220.1/27"    # задать ip интерфейсу enp0s8
+IP="11.11.11.1/27"    # задать ip интерфейсу enp0s8
 
 # Настройка DHCP сервера
-dhcp_1="192.168.220.0"    #подсеть
+dhcp_1="11.11.11.0"    #подсеть
 dhcp_2="255.255.255.224"    #маска
-dhcp_3="192.168.220.2 192.168.220.30"    #пул адресов
-dhcp_4="192.168.220.1"    #путь по умолчанию
-dhcp_5="10.10.10.1"    #сервер SRV-L
+dhcp_3="11.11.11.3 11.11.11.30"    #пул адресов
+dhcp_4="11.11.11.1"    #путь по умолчанию
+dhcp_5="11.11.11.2"    #сервер SRV-L
 domain="firma.rtk"    #DNS
 
 # Параметры туннеля
-LOCAL_IP="11.11.0.2"         # Локальный IP-адрес
-REMOTE_IP="22.22.0.2"        # Удалённый IP-адрес
+LOCAL_IP="172.16.4.2"         # Локальный IP-адрес
+REMOTE_IP="172.16.5.2"        # Удалённый IP-адрес
 TUNNEL_LOCAL_IP="10.10.10.1/30"     # Локальный IP туннеля
 TUNNEL_REMOTE_IP="10.10.10.2"    # Удалённый IP туннеля
 TUNNEL_NAME="gre-tunnel0"      # Имя туннеля
-NETWORK_Left="192.168.220.0/27"
-NETWORK_Right="172.16.220.0/27"
+NETWORK_Left="11.11.11.0/27"
+NETWORK_Right="22.22.22.0/25"
 NETWORK_TUNNEL="10.10.10.0/30"
 
 # admin
@@ -191,12 +189,12 @@ systemctl restart sshd
 
 #Настройка межсетевого экрана
 nft flush ruleset
-nft add table ip filter 
+nft add table ip filter
 nft add chain ip filter INPUT { type filter hook input priority 0 \; policy drop \;   }
 nft add rule ip filter INPUT iifname lo counter accept
 nft add rule ip filter INPUT iifname $INTERFACE_Left counter accept
 nft add rule ip filter INPUT iifname $INTERFACE_TOISP  ip protocol tcp  tcp dport { 80,$PORT,443 } counter accept
 nft add rule ip filter INPUT iifname $INTERFACE_TOISP  ip protocol udp  udp dport 53 counter accept
-nft add rule inet filter output ip protocol icmp accept
+nft add rule ip filter INPUT ip protocol icmp accept
 
 echo "Настройка завершена."
