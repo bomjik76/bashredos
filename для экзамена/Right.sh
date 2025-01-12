@@ -20,7 +20,7 @@ REMOTE_IP="172.16.4.2"        # Удалённый IP-адрес
 TUNNEL_LOCAL_IP="10.10.10.2/30"     # Локальный IP туннеля
 TUNNEL_REMOTE_IP="10.10.10.1"    # Удалённый IP туннеля
 TUNNEL_NAME="gre-tunnel0"      # Имя туннеля
-NETWORK_Left="11.11.11.0/27"
+NETWORK_Left="11.11.11.0/26"
 NETWORK_Right="22.22.22.0/25"
 NETWORK_TUNNEL="10.10.10.0/30"
 
@@ -163,5 +163,4 @@ sed -i "25 a Banner $BANNER_PATH" /etc/ssh/sshd_config
 # Перезапуск службы SSH для применения изменений
 echo "Перезапуск службы SSH..."
 systemctl restart sshd
-
 echo "Настройка завершена."

@@ -11,8 +11,8 @@ echo "Настройка сетевых интерфейсов..."
 INTERFACE_1="enp0s3"      # Интерфейс в сторону магистрального провайдера
 INTERFACE_2="enp0s8"  # Интерфейс в сторону офиса Left
 INTERFACE_3="enp0s9"  # Интерфейс в сторону офиса Right
-IP2="11.11.0.1/24"
-IP3="22.22.0.1/24"
+IP2="172.16.4.1/28"
+IP3="172.16.5.1/28"
 
 #Настройка часового пояса
 TIMEZONE="Europe/Moscow"
@@ -20,9 +20,9 @@ TIMEZONE="Europe/Moscow"
 
 # Назначение IP-адресов
 nmcli con modify $INTERFACE_2 ipv4.address $IP2
+nmcli con modify $INTERFACE_2 ipv4.method static
 nmcli con modify $INTERFACE_3 ipv4.address $IP3
 nmcli con modify $INTERFACE_3 ipv4.method static
-nmcli con modify $INTERFACE_2 ipv4.method static
 systemctl restart NetworkManager
 
 # Настройка nftables

@@ -60,7 +60,7 @@ echo "Принтер $PRINTER_NAME настроен как принтер по �
 echo "настройка timezone"
 timedatectl set-timezone $TIMEZONE
 
-echo "тык тык пошел нахуя яндекс браузер"
-dnf install yandex-browser-stable
+echo "тык тык пошел нахуй яндекс браузер"
+dnf install -y yandex-browser-stable
 
 echo "Настройка завершена."
