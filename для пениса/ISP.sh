@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -e
-
 HOSTNAME="isp"
 # Задать имя хоста
 hostnamectl set-hostname $HOSTNAME
@@ -11,22 +9,17 @@ echo "Настройка сетевых интерфейсов..."
 INTERFACE_1="enp0s3"      # Интерфейс в сторону магистрального провайдера
 INTERFACE_2="enp0s8"  # Интерфейс в сторону офиса Left
 INTERFACE_3="enp0s9"  # Интерфейс в сторону офиса Right
-IP2="172.16.4.1/28"
-IP3="172.16.5.1/28"
+IP2="22.22.22.1/28"
+IP3="11.11.0.1/27"
 
 #Настройка часового пояса
-TIMEZONE="Europe/Moscow"
-
+TIMEZONE="Asia/Yekaterinburg"
 
 # Настройка интерфейсов для офисов
 nmcli con mod $INTERFACE_2 ipv4.address $IP2
 nmcli con mod $INTERFACE_2 ipv4.method manual
 nmcli con mod $INTERFACE_3 ipv4.address $IP3
 nmcli con mod $INTERFACE_3 ipv4.method manual
-
-# Настройка маршрутов по умолчанию
-ip route add default via 172.16.4.1 dev $INTERFACE_2
-ip route add default via 172.16.5.1 dev $INTERFACE_3
 
 # Настройка nftables
 dnf install -y nftables

@@ -1,13 +1,11 @@
 #!/bin/bash
 
-set -e
-
-HOSTNAME="srv-l.firma.rtk."
+HOSTNAME="hq-srv.demo.rtk."
 # Задать имя хоста
 hostnamectl set-hostname $HOSTNAME
 
 #Настройка часового пояса
-TIMEZONE="Europe/Moscow"
+TIMEZONE="Asia/Yekaterinburg"
 
 # admin
 USERNAME="admin"

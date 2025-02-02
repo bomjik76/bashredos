@@ -6,22 +6,23 @@ HOSTNAME="br-rtr.demo.rtk"
 hostnamectl set-hostname $HOSTNAME
 
 # Настройка часового пояса
-TIMEZONE="UTC+5"
+TIMEZONE="Asia/Yekaterinburg"
 
 # Настройка сетевых интерфейсов
 echo "Настройка сетевых интерфейсов..."
 INTERFACE_TOISP="enp0s3"      # Интерфейс в сторону ISP
 INTERFACE_Right="enp0s8"  # Интерфейс в сторону офиса Right
-IP="11.11.0.1/27"    # задать ip интерфейсу enp0s8
+IP="172.16.0.1/24"    # задать ip интерфейсу enp0s8
 
 # Параметры туннеля
-LOCAL_IP="172.16.5.2"         # Локальный IP-адрес
-REMOTE_IP="172.16.4.2"        # Удалённый IP-адрес
+LOCAL_IP="11.11.0.2"         # Локальный IP-адрес
+REMOTE_IP="22.22.22.2"        # Удалённый IP-адрес
 TUNNEL_LOCAL_IP="10.10.10.2/30"     # Локальный IP туннеля
 TUNNEL_REMOTE_IP="10.10.10.1"    # Удалённый IP туннеля
 TUNNEL_NAME="gre-tunnel0"      # Имя туннеля
-NETWORK_Left="11.11.11.0/26"
-NETWORK_Right="22.22.22.0/25"
+NETWORK_Left="192.168.1.0/27"
+NETWORK_Right="172.16.0.0/24"
+NETWORK_2="192.168.2.0/29"
 NETWORK_TUNNEL="10.10.10.0/30"
 
 # Создание пользователя net_user
@@ -37,6 +38,7 @@ usermod -aG wheel "$USERNAME"
 echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USERNAME"
 
 # Настройка динамической маршрутизации средствами FRR
+dnf install -y frr
 sed -i "s/ospfd=no/ospfd=yes/" /etc/frr/daemons
 sed -i "s/ospf6d=no/ospf6d=yes/" /etc/frr/daemons
 systemctl enable --now frr
@@ -62,13 +64,6 @@ exit
 !
 EOL
 systemctl restart frr
-
-# Настройка часового пояса
-ln -sf /usr/share/zoneinfo/$TIMEZONE /etc/localtime
-hwclock --systohc
-
-# Перезапуск службы SSH для применения изменений
-systemctl restart sshd
 
 # Включение пересылки пакетов
 echo "Включение IP-перенаправления..."
@@ -114,6 +109,7 @@ remote $REMOTE_IP local $LOCAL_IP
 nmcli con mod $TUNNEL_NAME ipv4.addresses $TUNNEL_LOCAL_IP
 nmcli con mod $TUNNEL_NAME ipv4.method manual
 nmcli con mod $TUNNEL_NAME +ipv4.routes "$NETWORK_Left $TUNNEL_REMOTE_IP"
+nmcli con mod $TUNNEL_NAME +ipv4.routes "$NETWORK_2 $TUNNEL_REMOTE_IP"
 nmcli connection modify $TUNNEL_NAME ip-tunnel.ttl 64
 nmcli con up $TUNNEL_NAME
 
@@ -121,27 +117,7 @@ nmcli con up $TUNNEL_NAME
 echo "Туннель успешно настроен. Информация о туннеле:"
 ip addr show $TUNNEL_NAME
 
-# Настройка порта SSH
-echo "Настройка порта SSH..."
-semanage port -a -t ssh_port_t -p tcp $PORT
-setenforce 0
-sed -i "20 a Port $PORT" /etc/ssh/sshd_config
-# Разрешение подключения только пользователю $USERNAMESSH
-echo "Ограничение входа только для пользователя $USERNAMESSH..."
-sed -i "21 a PermitRootLogin no" /etc/ssh/sshd_config
-sed -i "22 a AllowUsers $USERNAMESSH" /etc/ssh/sshd_config
-# Ограничение количества попыток входа
-echo "Ограничение количества попыток входа..."
-sed -i "23 a MaxAuthTries $POPITKA" /etc/ssh/sshd_config
-# Ограничение по времени аутентификации
-sed -i "24 a LoginGraceTime $TIME" /etc/ssh/sshd_config
-# Настройка баннера SSH
-echo "Настройка SSH баннера..."
-BANNER_PATH="/etc/ssh-banner"
-echo "Добро пожаловать $USERNAMESSH!" > $BANNER_PATH
-sed -i "25 a Banner $BANNER_PATH" /etc/ssh/sshd_config
+echo "Настройка timezone"
+timedatectl set-timezone $TIMEZONE
 
-# Перезапуск службы SSH для применения изменений
-echo "Перезапуск службы SSH..."
-systemctl restart sshd
 echo "Настройка завершена."

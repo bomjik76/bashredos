@@ -1,52 +1,44 @@
 #!/bin/bash
 
 # Задать имя хоста
-HOSTMAME="r-left.firma.rtk."
+HOSTMAME="hq-rtr.demo.rtk."
 hostnamectl set-hostname $HOSTMAME
 
 #Настройка часового пояса
-TIMEZONE="Europe/Moscow"
+TIMEZONE="Asia/Yekaterinburg"
 
 # Настройка сетевых интерфейсов
 echo "Настройка сетевых интерфейсов..."
 INTERFACE_TOISP="enp0s3"      # Интерфейс в сторону ISP
-INTERFACE_Left="enp0s8"  # Интерфейс в сторону офиса Left
-IP="11.11.11.1/26"    # задать ip интерфейсу enp0s8
+INTERFACE_Left="enp0s8"  # Интерфейс в сторону HQ-SRV
+INTERFACE_Right="enp0s9"  # Интерфейс в сторону HQ-CLI
+IP="192.168.1.1/27"    # задать ip интерфейсу enp0s8
+IP2="192.168.2.1/29"    # задать ip интерфейсу enp0s9
 
 # Настройка DHCP сервера
-dhcp_1="11.11.11.0"    #подсеть
-dhcp_2="255.255.255.192"    #маска
-dhcp_3="11.11.11.3 11.11.11.62"    #пул адресов
-dhcp_4="11.11.11.1"    #путь по умолчанию
-dhcp_5="11.11.11.2,8.8.8.8"    #сервер SRV-L
-domain="firma.rtk"    #DNS
+dhcp_1="192.168.1.0"    #подсеть
+dhcp_2="255.255.255.224"    #маска
+dhcp_3="192.168.1.2 192.168.1.30"    #пул адресов
+dhcp_4="192.168.1.1"    #путь по умолчанию
+dhcp_5="192.168.2.2"    #сервер DNS
+domain="demo.rtk"    #DNS
 
 # Параметры туннеля
-LOCAL_IP="172.16.4.2"         # Локальный IP-адрес
-REMOTE_IP="172.16.5.2"        # Удалённый IP-адрес
+LOCAL_IP="22.22.22.2"         # Локальный IP-адрес
+REMOTE_IP="11.11.0.2"        # Удалённый IP-адрес
 TUNNEL_LOCAL_IP="10.10.10.1/30"     # Локальный IP туннеля
 TUNNEL_REMOTE_IP="10.10.10.2"    # Удалённый IP туннеля
 TUNNEL_NAME="gre-tunnel0"      # Имя туннеля
-NETWORK_Left="11.11.11.0/26"
-NETWORK_Right="22.22.22.0/25"
+NETWORK_Left="192.168.1.0/27"
+NETWORK_Right="172.16.0.0/24"
+NETWORK_2="192.168.2.0/29"
 NETWORK_TUNNEL="10.10.10.0/30"
-
-# admin
-USERNAME="admin"
-PASSWORD="P@ssw0rd"
-USER_ID="1010"
-
-# network_admin
-USERNAMESSH="network_admin"
-PASSWORDSSH="P@ssw0rd"
-USER1_ID="1030"
-PORT="2022"
-TIME="5m"       #Ограничение по времени
-POPITKA="3"     #Ограничение количества попыток входа
 
 # назначение IP-адресов
 nmcli con modify $INTERFACE_Left ipv4.address $IP
 nmcli con modify $INTERFACE_Left ipv4.method static
+nmcli con modify $INTERFACE_Right ipv4.address $IP2
+nmcli con modify $INTERFACE_Right ipv4.method static
 systemctl restart NetworkManager
 
 # Включение пересылки пакетов
@@ -105,10 +97,10 @@ systemctl enable --now nftables
 # Создание пользователя net_user
 USERNAME_NET="net_user"
 PASSWORD_NET="P@$$word"
-USER_ID_NET="1030"
+USER_ID="1111"
 
 # Создание пользователя
-useradd -m -s /bin/bash -u "$USER_ID_NET" "$USERNAME_NET"
+useradd -m -s /bin/bash -u "$USER_ID" "$USERNAME_NET"
 echo "$USERNAME_NET:$PASSWORD_NET" | chpasswd
 usermod -aG wheel "$USERNAME_NET"
 # Настройка sudo без пароля
@@ -124,6 +116,7 @@ nmcli connection modify $TUNNEL_NAME ip-tunnel.ttl 64
 nmcli con up $TUNNEL_NAME
 
 # Настройка динамической маршрутизации средствами FRR
+dnf install -y frr
 sed -i "s/ospfd=no/ospfd=yes/" /etc/frr/daemons
 sed -i "s/ospf6d=no/ospf6d=yes/" /etc/frr/daemons
 systemctl enable --now frr
@@ -145,59 +138,13 @@ router ospf
 passive-interface default
 network $NETWORK_TUNNEL area 0
 network $NETWORK_Left area 0
+network $NETWORK_2 area 0
 exit
 !
 EOL
 systemctl restart frr
 
-echo "Создание пользователя $USERNAME"
-# Создание пользователя
-useradd -m -s /bin/bash -u "$USER_ID" "$USERNAME"
-echo "$USERNAME:$PASSWORD" | chpasswd
-usermod -aG wheel "$USERNAME"
-echo "Пользователь $USERNAME создан."
-
-# Создание пользователя SSH
-echo "Создание пользователя $USERNAMESSH"
-useradd -m -s /bin/bash -u "$USER1_ID" "$USERNAMESSH"
-echo "$USERNAMESSH:$PASSWORDSSH" | chpasswd
-usermod -aG wheel "$USERNAMESSH"
-# Настройка sudo без пароля
-echo "$USERNAMESSH ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$USERNAMESSH"
-echo "Пользователь $USERNAMESSH создан и настроен для использования sudo без пароля."
-
-# Настройка порта SSH
-echo "Настройка порта SSH..."
-semanage port -a -t ssh_port_t -p tcp $PORT
-setenforce 0
-sed -i "20 a Port $PORT" /etc/ssh/sshd_config
-# Разрешение подключения только пользователю $USERNAMESSH
-echo "Ограничение входа только для пользователя $USERNAMESSH..."
-sed -i "21 a PermitRootLogin no" /etc/ssh/sshd_config
-sed -i "22 a AllowUsers $USERNAMESSH" /etc/ssh/sshd_config
-# Ограничение количества попыток входа
-echo "Ограничение количества попыток входа..."
-sed -i "23 a MaxAuthTries $POPITKA" /etc/ssh/sshd_config
-# Ограничение по времени аутентификации
-sed -i "24 a LoginGraceTime $TIME" /etc/ssh/sshd_config
-# Настройка баннера SSH
-echo "Настройка SSH баннера..."
-BANNER_PATH="/etc/ssh-banner"
-echo "Добро пожаловать $USERNAMESSH!" > $BANNER_PATH
-sed -i "25 a Banner $BANNER_PATH" /etc/ssh/sshd_config
-
-# Перезапуск службы SSH для применения изменений
-echo "Перезапуск службы SSH..."
-systemctl restart sshd
-
-#Настройка межсетевого экрана
-#nft flush ruleset
-#nft add table ip filter
-#nft add chain ip filter INPUT { type filter hook input priority 0 \; policy drop \;   }
-#nft add rule ip filter INPUT iifname lo counter accept
-#nft add rule ip filter INPUT iifname $INTERFACE_Left counter accept
-#nft add rule ip filter INPUT iifname $INTERFACE_TOISP  ip protocol tcp  tcp dport { 80,$PORT,443 } counter accept
-#nft add rule ip filter INPUT iifname $INTERFACE_TOISP  ip protocol udp  udp dport 53 counter accept
-#nft add rule ip filter INPUT ip protocol icmp accept
+echo "Настройка timezone"
+timedatectl set-timezone $TIMEZONE
 
 echo "Настройка завершена."
